@@ -10,3 +10,10 @@ TestResults/
 *.swm
 *.vhd
 *.vhdx
+
+# macOS Native App (SwiftPM & Packaging)
+.DS_Store
+macos/.build/
+macos/.swiftpm/
+macos/dist/
+*.dmg
