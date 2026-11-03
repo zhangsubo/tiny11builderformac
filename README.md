@@ -1,3 +1,10 @@
+> **🍎 Tiny11 Builder for Mac (Apple Silicon `M1`–`M4`)**
+> Native Swift 6 + SwiftUI desktop app to build trimmed Windows 11 ARM64 / x64 ISOs directly on macOS (for Parallels Desktop, VMware Fusion, UTM, or PC) — **no Windows VM, no `sudo`, no NTFS partition required**.
+> - 📦 [**Download `Tiny11Builder-macOS-arm64.dmg` (GitHub Releases)**](https://github.com/zhangsubo/tiny11builderformac/releases/latest)
+> - 📖 [**macOS Source & Documentation (`macos/`)**](macos/README.md)
+
+---
+
 # Tiny11 Builder
 
 Build a smaller Windows 11 ISO with a native WinUI app. Download an official
