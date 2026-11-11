@@ -109,6 +109,7 @@ public struct CleanupOption: Codable, Sendable, Equatable, Identifiable {
     public let macVMDefault: Bool
     public let tiny11Default: Bool
     public let coreDefault: Bool
+    public let customOnly: Bool
     public let targets: [String]
 
     public var title: String {
@@ -138,6 +139,7 @@ public struct CleanupOption: Codable, Sendable, Equatable, Identifiable {
         macVMDefault: Bool,
         tiny11Default: Bool,
         coreDefault: Bool,
+        customOnly: Bool = false,
         targets: [String] = []
     ) {
         self.id = id
@@ -146,6 +148,7 @@ public struct CleanupOption: Codable, Sendable, Equatable, Identifiable {
         self.macVMDefault = macVMDefault
         self.tiny11Default = tiny11Default
         self.coreDefault = coreDefault
+        self.customOnly = customOnly
         self.targets = targets
     }
 }
@@ -272,6 +275,8 @@ public struct BuildRecipe: Codable, Sendable, Equatable {
     public var removeRedundantData: Bool
     public var omitNetFx3Payload: Bool
     public var keepWorkingFiles: Bool
+    public var shrinkBootImage: Bool
+    public var isoSizeLimitBytes: Int64?
 
     public init(
         sourcePath: String = "",
@@ -289,7 +294,9 @@ public struct BuildRecipe: Codable, Sendable, Equatable {
         preferLocalAccount: Bool = true,
         removeRedundantData: Bool = true,
         omitNetFx3Payload: Bool = false,
-        keepWorkingFiles: Bool = false
+        keepWorkingFiles: Bool = false,
+        shrinkBootImage: Bool = false,
+        isoSizeLimitBytes: Int64? = nil
     ) {
         self.sourcePath = sourcePath
         self.imageIndex = imageIndex
@@ -307,6 +314,8 @@ public struct BuildRecipe: Codable, Sendable, Equatable {
         self.removeRedundantData = removeRedundantData
         self.omitNetFx3Payload = omitNetFx3Payload
         self.keepWorkingFiles = keepWorkingFiles
+        self.shrinkBootImage = shrinkBootImage
+        self.isoSizeLimitBytes = isoSizeLimitBytes
     }
 
     enum CodingKeys: String, CodingKey {
@@ -327,30 +336,127 @@ public struct BuildRecipe: Codable, Sendable, Equatable {
         case removeRedundantData
         case omitNetFx3Payload
         case keepWorkingFiles
+        case shrinkBootImage
+        case isoSizeLimitBytes
+    }
+
+    private enum UpstreamPascalKeys: String, CodingKey {
+        case schemaVersion = "SchemaVersion"
+        case sourcePath = "SourcePath"
+        case imageIndex = "ImageIndex"
+        case workspacePath = "WorkspacePath"
+        case outputPath = "OutputPath"
+        case mode = "Mode"
+        case flavor = "Flavor"
+        case coreAcknowledged = "CoreAcknowledged"
+        case compression = "Compression"
+        case selectedOptions = "SelectedOptions"
+        case enableNetFx3 = "EnableNetFx3"
+        case compactInstallation = "CompactInstallation"
+        case preferLocalAccount = "PreferLocalAccount"
+        case removeRedundantData = "RemoveRedundantData"
+        case omitNetFx3SetupPayload = "OmitNetFx3SetupPayload"
+        case keepWorkingFiles = "KeepWorkingFiles"
+        case shrinkBootImage = "ShrinkBootImage"
+        case isoSizeLimitBytes = "IsoSizeLimitBytes"
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
-        self.sourcePath = try container.decode(String.self, forKey: .sourcePath)
-        self.imageIndex = try container.decode(Int.self, forKey: .imageIndex)
-        self.workspacePath = try container.decode(String.self, forKey: .workspacePath)
-        self.outputPath = try container.decode(String.self, forKey: .outputPath)
-        let decodedMode = try container.decode(BuildMode.self, forKey: .mode)
+        let pascal = try decoder.container(keyedBy: UpstreamPascalKeys.self)
+
+        self.schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion)
+            ?? (try pascal.decodeIfPresent(Int.self, forKey: .schemaVersion))
+            ?? 1
+        self.sourcePath = try container.decodeIfPresent(String.self, forKey: .sourcePath)
+            ?? (try pascal.decodeIfPresent(String.self, forKey: .sourcePath))
+            ?? ""
+        self.imageIndex = try container.decodeIfPresent(Int.self, forKey: .imageIndex)
+            ?? (try pascal.decodeIfPresent(Int.self, forKey: .imageIndex))
+            ?? 1
+        let decodedWorkspace = try container.decodeIfPresent(String.self, forKey: .workspacePath)
+            ?? (try pascal.decodeIfPresent(String.self, forKey: .workspacePath))
+            ?? ""
+        self.workspacePath = decodedWorkspace.isEmpty ? BuildRecipe.defaultWorkspacePath() : decodedWorkspace
+        self.outputPath = try container.decodeIfPresent(String.self, forKey: .outputPath)
+            ?? (try pascal.decodeIfPresent(String.self, forKey: .outputPath))
+            ?? ""
+
+        let decodedMode = try container.decodeIfPresent(BuildMode.self, forKey: .mode)
+            ?? (try pascal.decodeIfPresent(BuildMode.self, forKey: .mode))
+            ?? .custom
         self.mode = decodedMode
-        let decodedOptions = try container.decode([String].self, forKey: .selectedOptions)
-        self.selectedOptions = decodedOptions
+
+        let rawOptions = try container.decodeIfPresent([String].self, forKey: .selectedOptions)
+            ?? (try pascal.decodeIfPresent([String].self, forKey: .selectedOptions))
+            ?? CleanupCatalog.optionIds(for: decodedMode)
+        let validOptionSet = Set(CleanupCatalog.options.map(\.id))
+        // Strip Windows-only DISM servicing option IDs (such as "cleanup") when importing upstream portable recipes
+        self.selectedOptions = rawOptions.filter { validOptionSet.contains($0) || $0 != "cleanup" }
+
         self.tiny11RemoveEdge = try container.decodeIfPresent(Bool.self, forKey: .tiny11RemoveEdge)
-            ?? (decodedMode == .tiny11 ? decodedOptions.contains("edge-files") : true)
-        self.coreFlavor = try container.decode(Bool.self, forKey: .coreFlavor)
-        self.coreAcknowledged = try container.decode(Bool.self, forKey: .coreAcknowledged)
-        self.compression = try container.decode(CompressionMode.self, forKey: .compression)
-        self.enableNetFx3 = try container.decode(Bool.self, forKey: .enableNetFx3)
-        self.compactInstallation = try container.decode(Bool.self, forKey: .compactInstallation)
-        self.preferLocalAccount = try container.decode(Bool.self, forKey: .preferLocalAccount)
-        self.removeRedundantData = try container.decode(Bool.self, forKey: .removeRedundantData)
-        self.omitNetFx3Payload = try container.decode(Bool.self, forKey: .omitNetFx3Payload)
-        self.keepWorkingFiles = try container.decode(Bool.self, forKey: .keepWorkingFiles)
+            ?? (decodedMode == .tiny11 ? self.selectedOptions.contains("edge-files") : true)
+
+        if let explicitCore = try container.decodeIfPresent(Bool.self, forKey: .coreFlavor) {
+            self.coreFlavor = explicitCore
+        } else if let upstreamFlavor = try pascal.decodeIfPresent(String.self, forKey: .flavor) {
+            self.coreFlavor = upstreamFlavor.caseInsensitiveCompare("Core") == .orderedSame
+        } else {
+            self.coreFlavor = (decodedMode == .tiny11Core)
+        }
+
+        self.coreAcknowledged = try container.decodeIfPresent(Bool.self, forKey: .coreAcknowledged)
+            ?? (try pascal.decodeIfPresent(Bool.self, forKey: .coreAcknowledged))
+            ?? false
+        self.compression = try container.decodeIfPresent(CompressionMode.self, forKey: .compression)
+            ?? (try pascal.decodeIfPresent(CompressionMode.self, forKey: .compression))
+            ?? .recoveryESD
+        self.enableNetFx3 = try container.decodeIfPresent(Bool.self, forKey: .enableNetFx3)
+            ?? (try pascal.decodeIfPresent(Bool.self, forKey: .enableNetFx3))
+            ?? false
+        self.compactInstallation = try container.decodeIfPresent(Bool.self, forKey: .compactInstallation)
+            ?? (try pascal.decodeIfPresent(Bool.self, forKey: .compactInstallation))
+            ?? true
+        self.preferLocalAccount = try container.decodeIfPresent(Bool.self, forKey: .preferLocalAccount)
+            ?? (try pascal.decodeIfPresent(Bool.self, forKey: .preferLocalAccount))
+            ?? false
+        self.removeRedundantData = try container.decodeIfPresent(Bool.self, forKey: .removeRedundantData)
+            ?? (try pascal.decodeIfPresent(Bool.self, forKey: .removeRedundantData))
+            ?? true
+        self.omitNetFx3Payload = try container.decodeIfPresent(Bool.self, forKey: .omitNetFx3Payload)
+            ?? (try pascal.decodeIfPresent(Bool.self, forKey: .omitNetFx3SetupPayload))
+            ?? false
+        self.keepWorkingFiles = try container.decodeIfPresent(Bool.self, forKey: .keepWorkingFiles)
+            ?? (try pascal.decodeIfPresent(Bool.self, forKey: .keepWorkingFiles))
+            ?? false
+        self.shrinkBootImage = try container.decodeIfPresent(Bool.self, forKey: .shrinkBootImage)
+            ?? (try pascal.decodeIfPresent(Bool.self, forKey: .shrinkBootImage))
+            ?? false
+        self.isoSizeLimitBytes = try container.decodeIfPresent(Int64.self, forKey: .isoSizeLimitBytes)
+            ?? (try pascal.decodeIfPresent(Int64.self, forKey: .isoSizeLimitBytes))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(sourcePath, forKey: .sourcePath)
+        try container.encode(imageIndex, forKey: .imageIndex)
+        try container.encode(workspacePath, forKey: .workspacePath)
+        try container.encode(outputPath, forKey: .outputPath)
+        try container.encode(mode, forKey: .mode)
+        try container.encode(tiny11RemoveEdge, forKey: .tiny11RemoveEdge)
+        try container.encode(coreFlavor, forKey: .coreFlavor)
+        try container.encode(coreAcknowledged, forKey: .coreAcknowledged)
+        try container.encode(compression, forKey: .compression)
+        try container.encode(selectedOptions, forKey: .selectedOptions)
+        try container.encode(enableNetFx3, forKey: .enableNetFx3)
+        try container.encode(compactInstallation, forKey: .compactInstallation)
+        try container.encode(preferLocalAccount, forKey: .preferLocalAccount)
+        try container.encode(removeRedundantData, forKey: .removeRedundantData)
+        try container.encode(omitNetFx3Payload, forKey: .omitNetFx3Payload)
+        try container.encode(keepWorkingFiles, forKey: .keepWorkingFiles)
+        try container.encode(shrinkBootImage, forKey: .shrinkBootImage)
+        try container.encodeIfPresent(isoSizeLimitBytes, forKey: .isoSizeLimitBytes)
     }
 
     public static func defaultWorkspacePath() -> String {
@@ -361,6 +467,12 @@ public struct BuildRecipe: Codable, Sendable, Equatable {
 
     public var effectiveCore: Bool {
         mode == .tiny11Core || (mode == .custom && coreFlavor)
+    }
+
+    /// Whether the build requires the legacy Windows Setup installer (`sources\setup.exe`) and interactive ProductKey UI.
+    /// Matches upstream `SetupInstaller.RequiresLegacy(recipe)`.
+    public var requiresLegacySetup: Bool {
+        effectiveCore || selectedOptions.contains(where: { CleanupCatalog.nativePayloadOptionIds.contains($0) })
     }
 
     public func validate() throws {
@@ -390,6 +502,9 @@ public struct BuildRecipe: Codable, Sendable, Equatable {
         }
         if effectiveCore && !coreAcknowledged {
             throw Tiny11Error.validationFailed(L10n.coreNotAcknowledgedError())
+        }
+        if let limit = isoSizeLimitBytes, (limit < 64_000_000 || limit > 4_000_000_000) {
+            throw Tiny11Error.validationFailed(L10n.invalidIsoSizeLimitError())
         }
         let validIds = Set(CleanupCatalog.options.map(\.id))
         for optionId in selectedOptions where !validIds.contains(optionId) {
@@ -474,6 +589,9 @@ public struct BuildResult: Codable, Sendable, Equatable {
     public let deprovisionedAppsCount: Int
     public let appliedPoliciesCount: Int
     public let warnings: [String]
+    public let bootImageBytesBefore: Int64?
+    public let bootImageBytesAfter: Int64?
+    public let isoSizeLimitBytes: Int64?
 
     public init(
         isoPath: String,
@@ -486,7 +604,10 @@ public struct BuildResult: Codable, Sendable, Equatable {
         removedEntriesCount: Int,
         deprovisionedAppsCount: Int,
         appliedPoliciesCount: Int,
-        warnings: [String]
+        warnings: [String],
+        bootImageBytesBefore: Int64? = nil,
+        bootImageBytesAfter: Int64? = nil,
+        isoSizeLimitBytes: Int64? = nil
     ) {
         self.isoPath = isoPath
         self.sha256 = sha256
@@ -499,6 +620,9 @@ public struct BuildResult: Codable, Sendable, Equatable {
         self.deprovisionedAppsCount = deprovisionedAppsCount
         self.appliedPoliciesCount = appliedPoliciesCount
         self.warnings = warnings
+        self.bootImageBytesBefore = bootImageBytesBefore
+        self.bootImageBytesAfter = bootImageBytesAfter
+        self.isoSizeLimitBytes = isoSizeLimitBytes
     }
 }
 

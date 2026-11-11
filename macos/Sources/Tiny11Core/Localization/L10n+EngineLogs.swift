@@ -266,6 +266,18 @@ public extension L10n {
         )
     }
 
+    static func logScheduledNativePayloadDelete(group: String, path: String, lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "计划移除底层组件载荷 [\(group)]: \(path)",
+            en: "Scheduled direct payload removal [\(group)]: \(path)",
+            fr: "Suppression directe prévue [\(group)] : \(path)",
+            es: "Programada eliminación directa de carga [\(group)]: \(path)",
+            ru: "Запланировано прямое удаление компонента [\(group)]: \(path)",
+            ar: "جدولة الإزالة المباشرة للحزمة [\(group)]: \(path)"
+        )
+    }
+
     static func logCorePrunedWinSxS(_ count: Int, lang: AppLanguage = L10n.currentLanguage) -> String {
         tr(
             lang: lang,
@@ -341,12 +353,24 @@ public extension L10n {
     static func logRemovedEdgeUninstall(_ path: String, lang: AppLanguage = L10n.currentLanguage) -> String {
         tr(
             lang: lang,
-            zh: "已移除离线 Edge 卸载残留项: \(path)\\Microsoft Edge",
-            en: "Removed offline Edge uninstall entry: \(path)\\Microsoft Edge",
-            fr: "Entrée de désinstallation Edge hors ligne supprimée : \(path)\\Microsoft Edge",
-            es: "Eliminada entrada de desinstalación de Edge: \(path)\\Microsoft Edge",
-            ru: "Удалена запись деинсталляции Edge: \(path)\\Microsoft Edge",
-            ar: "تمت إزالة مدخل إلغاء تثبيت Edge: \(path)\\Microsoft Edge"
+            zh: "已移除离线 Edge 卸载残留项: \(path)",
+            en: "Removed offline Edge uninstall entry: \(path)",
+            fr: "Entrée de désinstallation Edge hors ligne supprimée : \(path)",
+            es: "Eliminada entrada de desinstalación de Edge: \(path)",
+            ru: "Удалена запись деинсталляции Edge: \(path)",
+            ar: "تمت إزالة مدخل إلغاء تثبيت Edge: \(path)"
+        )
+    }
+
+    static func logBootWimShrunk(before: String, after: String, lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "已将 boot.wim 重建为单 Setup 引导卷并极限压缩: \(before) -> \(after)",
+            en: "Rebuilt stock boot.wim with one bootable Setup index and maximum compression: \(before) -> \(after)",
+            fr: "boot.wim reconstruit en un seul index Setup amorçable et compression maximale : \(before) -> \(after)",
+            es: "boot.wim reconstruido con un único índice Setup arrancable y compresión máxima: \(before) -> \(after)",
+            ru: "Образ boot.wim пересобран с одним загрузочным индексом Setup и максимальным сжатием: \(before) -> \(after)",
+            ar: "تمت إعادة بناء boot.wim بفهرس إعداد واحد قابل للإقلاع وضغط أقصى: \(before) -> \(after)"
         )
     }
 

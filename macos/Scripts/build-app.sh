@@ -95,6 +95,7 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
     <array>
         <string>en</string>
         <string>zh-Hans</string>
+        <string>zh-Hant</string>
         <string>fr</string>
         <string>es</string>
         <string>ru</string>
@@ -128,7 +129,7 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-for lang in en zh-Hans fr es ru ar; do
+for lang in en zh-Hans zh-Hant fr es ru ar; do
     mkdir -p "$APP_BUNDLE/Contents/Resources/${lang}.lproj"
     cat > "$APP_BUNDLE/Contents/Resources/${lang}.lproj/InfoPlist.strings" <<'STRINGS_EOF'
 "CFBundleDisplayName" = "Tiny11 Builder";

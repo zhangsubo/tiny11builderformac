@@ -442,6 +442,31 @@ public extension L10n {
         )
     }
 
+    static func invalidIsoSizeLimitError(lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "自定义 ISO 体积上限必须在 64 MB 到 4 GB（十进制字节）之间。",
+            en: "Custom ISO size limits must be between 64 MB and 4 GB (decimal bytes).",
+            fr: "La limite de taille ISO doit être comprise entre 64 Mo et 4 Go (octets décimaux).",
+            es: "El límite de tamaño ISO debe estar entre 64 MB y 4 GB (bytes decimales).",
+            ru: "Лимит размера ISO должен быть в пределах от 64 МБ до 4 ГБ (в десятичных байтах).",
+            ar: "يجب أن يكون حد حجم ملف ISO المخصّص بين 64 ميغابايت و4 غيغابايت."
+        )
+    }
+
+    static func isoSizeLimitExceededError(actualBytes: Int64, limitBytes: Int64, lang: AppLanguage = L10n.currentLanguage) -> String {
+        let diff = actualBytes - limitBytes
+        return tr(
+            lang: lang,
+            zh: "生成的完整 ISO 大小为 \(actualBytes) 字节，超出设定的 \(limitBytes) 字节上限 \(diff) 字节，未发布输出。请减少保留的组件或在构建设置中移除体积上限。",
+            en: "The complete ISO is \(actualBytes) bytes, exceeding the \(limitBytes)-byte limit by \(diff) bytes. Reduce retained payloads or clear the ISO size limit in Build Settings.",
+            fr: "L’ISO complet fait \(actualBytes) octets, dépassant la limite de \(limitBytes) octets de \(diff) octets. Réduisez les composants ou retirez la limite de taille.",
+            es: "El ISO completo mide \(actualBytes) bytes, superando el límite de \(limitBytes) bytes por \(diff) bytes. Reduce cargas o elimina el límite de tamaño.",
+            ru: "Итоговый ISO весит \(actualBytes) байт, превышая лимит \(limitBytes) байт на \(diff) байт. Уменьшите объём компонентов или снимите лимит размера.",
+            ar: "حجم ملف ISO الكامل هو \(actualBytes) بايت، متجاوزًا الحد المسموح (\(limitBytes) بايت) بمقدار \(diff) بايت. قلّل المكونات أو أزل حد الحجم."
+        )
+    }
+
     static func toolMissingError(_ detail: String, lang: AppLanguage = L10n.currentLanguage) -> String {
         tr(
             lang: lang,

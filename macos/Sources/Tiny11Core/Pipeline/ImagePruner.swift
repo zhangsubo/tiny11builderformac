@@ -58,7 +58,7 @@ public enum ImagePruner {
             lowerLookup["/windows/winsxs/reboot.xml"] != nil
         let hasPending = hasPendingXml || hasRegistryPending
 
-        if hasPending && recipe.effectiveCore {
+        if hasPending && recipe.requiresLegacySetup {
             throw Tiny11Error.validationFailed(L10n.corePendingUpdateError())
         }
 
@@ -120,6 +120,30 @@ public enum ImagePruner {
                         scheduleDelete(p)
                         edgeRemoved = true
                     }
+                }
+            }
+        }
+
+        // 3b. 自定义深度底层目录移除（对应原版 NativePayloadOptions.cs）
+        for option in CleanupCatalog.options where CleanupCatalog.nativePayloadOptionIds.contains(option.id) && selectedSet.contains(option.id) {
+            for targetPrefix in option.targets {
+                if let exact = lowerLookup[targetPrefix.lowercased()] {
+                    scheduleDelete(exact)
+                    log(L10n.logScheduledNativePayloadDelete(group: option.id, path: exact))
+                }
+            }
+        }
+        if selectedSet.contains("remove-print-drivers") {
+            let repoPrefix = "/windows/system32/driverstore/filerepository/"
+            let printPrefixes = ["prn", "scan", "mfd"]
+            for p in allWimPaths {
+                let lp = p.lowercased()
+                guard lp.hasPrefix(repoPrefix) else { continue }
+                let rest = lp.dropFirst(repoPrefix.count)
+                guard !rest.isEmpty, !rest.contains("/") else { continue }
+                if printPrefixes.contains(where: { rest.hasPrefix($0) }) {
+                    scheduleDelete(p)
+                    log(L10n.logScheduledNativePayloadDelete(group: "remove-print-drivers", path: p))
                 }
             }
         }

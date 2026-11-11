@@ -182,6 +182,8 @@ public final class BuilderViewModel {
                 for: mode,
                 tiny11RemoveEdge: recipe.tiny11RemoveEdge
             )
+            recipe.shrinkBootImage = false
+            recipe.isoSizeLimitBytes = nil
         }
         if mode == .macVM {
             recipe.preferLocalAccount = true
@@ -399,10 +401,26 @@ public final class BuilderViewModel {
         if panel.runModal() == .OK, let url = panel.url {
             do {
                 let data = try Data(contentsOf: url)
-                let loaded = try JSONDecoder().decode(BuildRecipe.self, from: data)
+                var loaded = try JSONDecoder().decode(BuildRecipe.self, from: data)
+                let previousSource = recipe.sourcePath
+                let previousIndex = recipe.imageIndex
+                let previousWorkspace = recipe.workspacePath
+                let previousOutput = recipe.outputPath
+                if loaded.sourcePath.isEmpty {
+                    loaded.sourcePath = previousSource
+                    loaded.imageIndex = previousIndex
+                }
+                if loaded.workspacePath.isEmpty {
+                    loaded.workspacePath = previousWorkspace
+                }
+                if loaded.outputPath.isEmpty {
+                    loaded.outputPath = previousOutput
+                }
                 self.recipe = loaded
-                if !loaded.sourcePath.isEmpty && FileManager.default.fileExists(atPath: loaded.sourcePath) {
+                if !loaded.sourcePath.isEmpty && loaded.sourcePath != previousSource && FileManager.default.fileExists(atPath: loaded.sourcePath) {
                     loadSource(url: URL(fileURLWithPath: loaded.sourcePath))
+                } else if loaded.outputPath.isEmpty {
+                    updateDefaultOutputPath()
                 }
                 showBanner(L10n.recipeImportedBanner(url.lastPathComponent), isError: false)
             } catch {

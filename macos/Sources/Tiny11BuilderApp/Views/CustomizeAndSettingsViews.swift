@@ -124,6 +124,14 @@ struct CustomizationView: View {
                                     .padding(.vertical, 2)
                                     .background(Color.secondary.opacity(0.12), in: Capsule())
                                     .foregroundStyle(.secondary)
+                                if option.customOnly {
+                                    Text(L10n.customOnlyBadge())
+                                        .font(.caption2.weight(.medium))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.orange.opacity(0.16), in: Capsule())
+                                        .foregroundStyle(.orange)
+                                }
                             }
                             Text(option.description)
                                 .font(.caption)
@@ -226,12 +234,41 @@ struct SettingsView: View {
                     )
                     Divider()
                     SettingToggleRow(
+                        title: L10n.shrinkBootImageTitle(),
+                        subtitle: L10n.shrinkBootImageSubtitle(),
+                        isOn: $vm.recipe.shrinkBootImage
+                    )
+                    Divider()
+                    SettingToggleRow(
                         title: L10n.keepWorkingFilesTitle(),
                         subtitle: L10n.keepWorkingFilesSubtitle(),
                         isOn: $vm.recipe.keepWorkingFiles
                     )
                 }
                 .padding(8)
+            }
+
+            if let limit = vm.recipe.isoSizeLimitBytes {
+                GroupBox {
+                    HStack(spacing: 12) {
+                        Image(systemName: "scalemass.fill")
+                            .foregroundStyle(.orange)
+                            .font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.isoSizeLimitBoxTitle(L10n.formatBytes(limit)))
+                                .font(.subheadline.weight(.semibold))
+                            Text(L10n.isoSizeLimitSubtitle())
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button(L10n.clearLimitButton()) {
+                            vm.recipe.isoSizeLimitBytes = nil
+                        }
+                        .controlSize(.small)
+                    }
+                    .padding(6)
+                }
             }
 
             GroupBox(L10n.pathsBoxTitle()) {

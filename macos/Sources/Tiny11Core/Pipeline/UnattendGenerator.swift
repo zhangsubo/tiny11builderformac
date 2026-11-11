@@ -63,13 +63,21 @@ public enum UnattendGenerator {
         }
 
         let hideOnlineXml = recipe.preferLocalAccount ? "\n                <HideOnlineAccountScreens>true</HideOnlineAccountScreens>" : ""
+        let legacyProductKeyXml = recipe.requiresLegacySetup ? """
+                    <UserData>
+                        <ProductKey>
+                            <WillShowUI>Always</WillShowUI>
+                        </ProductKey>
+                    </UserData>
+
+        """ : ""
 
         return """
         <?xml version="1.0" encoding="utf-8"?>
         <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
             <settings pass="windowsPE">
                 <component name="Microsoft-Windows-Setup" processorArchitecture="\(arch)" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-                    <ImageInstall>
+        \(legacyProductKeyXml)            <ImageInstall>
                         <OSImage>
                             <Compact>\(compactText)</Compact>
                             <WillShowUI>OnError</WillShowUI>

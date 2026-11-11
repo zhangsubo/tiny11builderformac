@@ -931,6 +931,138 @@ public extension L10n {
                 )
             )
 
+        case "remove-wow64":
+            return (
+                tr(
+                    lang: lang,
+                    zh: "移除 32 位应用兼容层 (SysWOW64 / SysArm32)",
+                    en: "Remove 32-Bit Application Support (WOW64)",
+                    fr: "Supprimer la prise en charge des applications 32 bits (WOW64)",
+                    es: "Eliminar soporte de aplicaciones de 32 bits (WOW64)",
+                    ru: "Удалить поддержку 32-разрядных приложений (WOW64)",
+                    ar: "إزالة دعم تطبيقات 32 بت (SysWOW64)"
+                ),
+                tr(
+                    lang: lang,
+                    zh: "直接删除 SysWOW64 / SysArm32 与 32 位公共目录。仅限自定义模式，移除后所有 32 位软件与安装器将无法运行。",
+                    en: "Remove SysWOW64 / SysArm32 and 32-bit shared files. Custom only; 32-bit applications and installers will not work.",
+                    fr: "Supprime SysWOW64 / SysArm32 et les fichiers partagés 32 bits. Mode Custom uniquement ; les logiciels 32 bits ne fonctionneront plus.",
+                    es: "Elimina SysWOW64 / SysArm32 y archivos compartidos de 32 bits. Solo en Custom; las apps de 32 bits dejarán de funcionar.",
+                    ru: "Удаляет SysWOW64 / SysArm32 и общие 32-битные файлы. Только в Custom; 32-разрядные программы работать не будут.",
+                    ar: "إزالة مجلدات SysWOW64 وملفات 32 بت المشتركة. للوضع المخصّص فقط؛ لن تعمل تطبيقات 32 بت بعد ذلك."
+                )
+            )
+
+        case "remove-desktop-netfx":
+            return (
+                tr(
+                    lang: lang,
+                    zh: "移除桌面版 .NET Framework 运行库",
+                    en: "Remove Desktop .NET Framework Payloads",
+                    fr: "Supprimer le .NET Framework de bureau",
+                    es: "Eliminar cargas de .NET Framework de escritorio",
+                    ru: "Удалить настольный .NET Framework",
+                    ar: "إزالة حزم .NET Framework لسطح المكتب"
+                ),
+                tr(
+                    lang: lang,
+                    zh: "删除 Windows\\Microsoft.NET 与全局程序集缓存 (assembly)。依赖 .NET Framework 的传统桌面程序与 PowerShell 模块可能无法运行。",
+                    en: "Remove Windows\\Microsoft.NET and native assembly caches. Managed desktop applications may stop working.",
+                    fr: "Supprime Windows\\Microsoft.NET et les caches d’assemblages. Les applications .NET classiques risquent de ne plus fonctionner.",
+                    es: "Elimina Windows\\Microsoft.NET y cachés de ensamblados. Las aplicaciones de escritorio .NET pueden dejar de funcionar.",
+                    ru: "Удаляет Windows\\Microsoft.NET и кэши сборок. Программы на базе классического .NET могут перестать запускаться.",
+                    ar: "حذف مجلدات Windows\\Microsoft.NET وذاكرة التجميعات؛ قد تتوقف تطبيقات سطح المكتب المعتمدة على .NET عن العمل."
+                )
+            )
+
+        case "remove-ime-files":
+            return (
+                tr(
+                    lang: lang,
+                    zh: "移除内置亚洲语言输入法引擎 (IME)",
+                    en: "Remove Asian-Language Input Method Files (IME)",
+                    fr: "Supprimer les méthodes de saisie asiatiques (IME)",
+                    es: "Eliminar métodos de entrada de idiomas asiáticos (IME)",
+                    ru: "Удалить файлы азиатских методов ввода (IME)",
+                    ar: "إزالة ملفات طرق الإدخال الآسيوية (IME)"
+                ),
+                tr(
+                    lang: lang,
+                    zh: "直接删除 Windows\\IME 与 System32\\InputMethod 目录。若您需要使用中文、日文或韩文输入法，请勿勾选此项！",
+                    en: "Remove Windows\\IME and InputMethod payloads. Keep this unchecked if you need Chinese, Japanese, or Korean input methods.",
+                    fr: "Supprime Windows\\IME et InputMethod. Ne cochez pas cette option si vous utilisez la saisie chinoise, japonaise ou coréenne.",
+                    es: "Elimina Windows\\IME e InputMethod. No marques esta opción si necesitas métodos de entrada chino, japonés o coreano.",
+                    ru: "Удаляет каталоги Windows\\IME и InputMethod. Не отмечайте, если вам нужен ввод на китайском, японском или корейском.",
+                    ar: "حذف مجلدات Windows\\IME وInputMethod. اترك هذا الخيار غير محدد إذا كنت بحاجة إلى طرق الإدخال الصينية أو اليابانية أو الكورية."
+                )
+            )
+
+        case "remove-speech-files":
+            return (
+                tr(
+                    lang: lang,
+                    zh: "移除离线语音引擎与 OCR 目录",
+                    en: "Remove Speech Synthesis & OCR Engine Files",
+                    fr: "Supprimer les moteurs vocaux et fichiers OCR",
+                    es: "Eliminar motores de voz y archivos OCR",
+                    ru: "Удалить голосовые движки и файлы OCR",
+                    ar: "إزالة محركات النطق وملفات التعرف الضوئي OCR"
+                ),
+                tr(
+                    lang: lang,
+                    zh: "直接删除 Windows\\Speech、Speech_OneCore 与 Windows\\OCR 目录。语音听写、屏幕朗读与离线文字识别将不可用。",
+                    en: "Delete Windows\\Speech, Speech_OneCore, and Windows\\OCR directly. Voice typing, narrator voices, and OCR may stop working.",
+                    fr: "Supprime directement Windows\\Speech, Speech_OneCore et Windows\\OCR. La dictée vocale et la lecture d’écran ne fonctionneront plus.",
+                    es: "Elimina directamente Windows\\Speech, Speech_OneCore y Windows\\OCR. El dictado por voz, narrador y OCR dejarán de funcionar.",
+                    ru: "Напрямую удаляет Windows\\Speech, Speech_OneCore и Windows\\OCR. Голосовой ввод, диктор и распознавание текста перестанут работать.",
+                    ar: "حذف مجلدات Windows\\Speech وSpeech_OneCore وWindows\\OCR مباشرةً؛ قد يتوقف الإملاء الصوتي وقارئ الشاشة عن العمل."
+                )
+            )
+
+        case "remove-print-drivers":
+            return (
+                tr(
+                    lang: lang,
+                    zh: "移除内置打印机与扫描仪驱动库",
+                    en: "Remove Printer & Scanner Driver-Store Payloads",
+                    fr: "Supprimer les pilotes d’imprimantes et de scanners intégrés",
+                    es: "Eliminar controladores de impresoras y escáneres incluidos",
+                    ru: "Удалить встроенные драйверы принтеров и сканеров",
+                    ar: "إزالة تعريفات الطابعات والماسحات الضوئية المدمجة"
+                ),
+                tr(
+                    lang: lang,
+                    zh: "删除 DriverStore 中 prn/scan/mfd 开头的打印扫描驱动包（保留磁盘、USB、显卡与网卡驱动），大幅缩减驱动库体积。",
+                    en: "Remove prn/scan/mfd driver-store packages while keeping storage, USB, display, and network drivers.",
+                    fr: "Supprime les paquets prn/scan/mfd du magasin de pilotes tout en conservant les pilotes stockage, USB, affichage et réseau.",
+                    es: "Elimina paquetes prn/scan/mfd del almacén de controladores conservando almacenamiento, USB, pantalla y red.",
+                    ru: "Удаляет пакеты prn/scan/mfd из хранилища драйверов, сохраняя драйверы дисков, USB, видео и сети.",
+                    ar: "إزالة حزم تعريفات الطباعة والمسح من مخزن التعريفات مع الحفاظ على تعريفات التخزين وUSB والشاشة والشبكة."
+                )
+            )
+
+        case "remove-extra-media":
+            return (
+                tr(
+                    lang: lang,
+                    zh: "移除自带壁纸、系统提示音、帮助与附加指针",
+                    en: "Remove Bundled Wallpapers, Sounds, Help & Cursors",
+                    fr: "Supprimer fonds d’écran, sons système, aide et curseurs",
+                    es: "Eliminar fondos de pantalla, sonidos, ayuda y cursores",
+                    ru: "Удалить стандартные обои, звуки, справку и курсоры",
+                    ar: "إزالة الخلفيات المدمجة وأصوات النظام وملفات المساعدة والمؤشرات"
+                ),
+                tr(
+                    lang: lang,
+                    zh: "直接删除 Windows\\Web（壁纸）、Windows\\Media（音效）、Windows\\Help 与 Windows\\Cursors 以极致压缩镜像体积。",
+                    en: "Delete Windows\\Web, Windows\\Media, Windows\\Help, and Windows\\Cursors for maximum image size reduction.",
+                    fr: "Supprime Windows\\Web, Windows\\Media, Windows\\Help et Windows\\Cursors pour réduire au maximum la taille de l’image.",
+                    es: "Elimina Windows\\Web, Windows\\Media, Windows\\Help y Windows\\Cursors para reducir al máximo el tamaño de la imagen.",
+                    ru: "Удаляет каталоги Windows\\Web, Windows\\Media, Windows\\Help и Windows\\Cursors для максимального уменьшения образа.",
+                    ar: "حذف مجلدات Windows\\Web وWindows\\Media وWindows\\Help وWindows\\Cursors لتقليص حجم الصورة إلى أقصى حد."
+                )
+            )
+
         default:
             return (id, id)
         }

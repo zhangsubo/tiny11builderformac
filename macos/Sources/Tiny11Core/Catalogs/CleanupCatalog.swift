@@ -73,6 +73,70 @@ public enum CleanupCatalog {
             tiny11Default: true,
             coreDefault: true
         ),
+        CleanupOption(
+            id: "remove-wow64",
+            categoryId: .systemFiles,
+            kind: .file,
+            macVMDefault: false,
+            tiny11Default: false,
+            coreDefault: false,
+            customOnly: true,
+            targets: ["/windows/syswow64", "/windows/sysarm32", "/program files (x86)/common files"]
+        ),
+        CleanupOption(
+            id: "remove-desktop-netfx",
+            categoryId: .systemFiles,
+            kind: .file,
+            macVMDefault: false,
+            tiny11Default: false,
+            coreDefault: false,
+            customOnly: true,
+            targets: [
+                "/windows/microsoft.net",
+                "/windows/assembly",
+                "/program files/reference assemblies",
+                "/program files (x86)/reference assemblies"
+            ]
+        ),
+        CleanupOption(
+            id: "remove-ime-files",
+            categoryId: .systemFiles,
+            kind: .file,
+            macVMDefault: false,
+            tiny11Default: false,
+            coreDefault: false,
+            customOnly: true,
+            targets: ["/windows/ime", "/windows/system32/ime", "/windows/system32/inputmethod"]
+        ),
+        CleanupOption(
+            id: "remove-speech-files",
+            categoryId: .systemFiles,
+            kind: .file,
+            macVMDefault: false,
+            tiny11Default: false,
+            coreDefault: false,
+            customOnly: true,
+            targets: ["/windows/speech", "/windows/speech_onecore", "/windows/ocr"]
+        ),
+        CleanupOption(
+            id: "remove-print-drivers",
+            categoryId: .systemFiles,
+            kind: .file,
+            macVMDefault: false,
+            tiny11Default: false,
+            coreDefault: false,
+            customOnly: true
+        ),
+        CleanupOption(
+            id: "remove-extra-media",
+            categoryId: .systemFiles,
+            kind: .file,
+            macVMDefault: false,
+            tiny11Default: false,
+            coreDefault: false,
+            customOnly: true,
+            targets: ["/windows/web", "/windows/media", "/windows/help", "/windows/cursors"]
+        ),
 
         // 3. Features & Capabilities
         CleanupOption(
@@ -162,6 +226,15 @@ public enum CleanupCatalog {
             coreDefault: core
         )
     }
+
+    public static let nativePayloadOptionIds: Set<String> = [
+        "remove-wow64",
+        "remove-desktop-netfx",
+        "remove-ime-files",
+        "remove-speech-files",
+        "remove-print-drivers",
+        "remove-extra-media"
+    ]
 
     public static func optionIds(for mode: BuildMode, tiny11RemoveEdge: Bool = true) -> [String] {
         switch mode {

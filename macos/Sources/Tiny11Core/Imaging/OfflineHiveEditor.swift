@@ -329,21 +329,33 @@ public enum OfflineHiveEditor {
             log(L10n.logLockedDeprovisioned(family))
         }
 
-        // 5. 若物理移除了 Edge 文件，同步清理已安装程序列表中的 Microsoft Edge 卸载入口（对应原版 EdgeRegistration.cs）
+        // 5. 若物理移除了 Edge 文件，同步清理已安装程序列表中的 Microsoft Edge / EdgeUpdate / WebView2 卸载入口（对应原版 EdgeRegistration.cs）
         if removeEdgeUninstallEntry {
+            let candidates: [(key: String, displayNames: [String])] = [
+                ("Microsoft Edge", ["Microsoft Edge"]),
+                ("Microsoft Edge Update", ["Microsoft Edge Update"]),
+                ("Microsoft EdgeWebView", ["Microsoft Edge WebView", "Microsoft Edge WebView2 Runtime"]),
+                ("Microsoft Edge WebView", ["Microsoft Edge WebView", "Microsoft Edge WebView2 Runtime"]),
+                ("Microsoft Edge WebView2 Runtime", ["Microsoft Edge WebView2 Runtime"])
+            ]
             for uninstallPath in [
                 #"Microsoft\Windows\CurrentVersion\Uninstall"#,
                 #"WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"#
             ] {
                 guard let uninstallNode = try software.findNode(path: uninstallPath) else { continue }
-                for (name, child) in try software.children(of: uninstallNode) where name.caseInsensitiveCompare("Microsoft Edge") == .orderedSame {
-                    let display = try software.getString(node: child, name: "DisplayName") ?? ""
-                    let publisher = try software.getString(node: child, name: "Publisher") ?? ""
-                    if display.caseInsensitiveCompare("Microsoft Edge") == .orderedSame &&
-                       publisher.caseInsensitiveCompare("Microsoft Corporation") == .orderedSame {
-                        try software.deleteNode(child, description: "\(uninstallPath)\\Microsoft Edge")
-                        summary.edgeUninstallRemoved = true
-                        log(L10n.logRemovedEdgeUninstall(uninstallPath))
+                let existingChildren = try software.children(of: uninstallNode)
+                for candidate in candidates {
+                    for (name, child) in existingChildren where name.caseInsensitiveCompare(candidate.key) == .orderedSame {
+                        let display = try software.getString(node: child, name: "DisplayName") ?? ""
+                        let publisher = try software.getString(node: child, name: "Publisher") ?? ""
+                        let matchesDisplay = candidate.displayNames.contains {
+                            display.caseInsensitiveCompare($0) == .orderedSame
+                        }
+                        if matchesDisplay && publisher.caseInsensitiveCompare("Microsoft Corporation") == .orderedSame {
+                            try software.deleteNode(child, description: "\(uninstallPath)\\\(name)")
+                            summary.edgeUninstallRemoved = true
+                            log(L10n.logRemovedEdgeUninstall("\(uninstallPath)\\\(name)"))
+                        }
                     }
                 }
             }

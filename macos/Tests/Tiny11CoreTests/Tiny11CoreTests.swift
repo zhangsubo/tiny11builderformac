@@ -69,14 +69,19 @@ struct Tiny11CoreTests {
         #expect(!ImagePruner.preserveCoreWinSxSDirectory("arm64_microsoft-windows-calc_31bf3856ad364e35_10.0.26100.1_none"))
     }
 
-    @Test("i18n 系统语言跟随与非支持语言回退英文规则验证")
+    @Test("i18n 系统语言跟随（含简繁中文区分）与非支持语言回退英文规则验证")
     func languageResolutionAndFallback() {
         let emptyEnv: [String: String] = [:]
 
-        // 六种受支持语言及地区变体识别
+        // 七种受支持语言及地区变体识别（区分简体与繁体中文）
         #expect(AppLanguage.resolve(preferredLanguages: ["zh-Hans-CN", "en-US"], environment: emptyEnv) == .zh)
         #expect(AppLanguage.resolve(preferredLanguages: ["zh_CN"], environment: emptyEnv) == .zh)
-        #expect(AppLanguage.resolve(preferredLanguages: ["zh-Hant-HK"], environment: emptyEnv) == .zh)
+        #expect(AppLanguage.resolve(preferredLanguages: ["zh-SG"], environment: emptyEnv) == .zh)
+        #expect(AppLanguage.resolve(preferredLanguages: ["zh-Hant-HK"], environment: emptyEnv) == .zhHant)
+        #expect(AppLanguage.resolve(preferredLanguages: ["zh-Hant-TW"], environment: emptyEnv) == .zhHant)
+        #expect(AppLanguage.resolve(preferredLanguages: ["zh-TW"], environment: emptyEnv) == .zhHant)
+        #expect(AppLanguage.resolve(preferredLanguages: ["zh_HK"], environment: emptyEnv) == .zhHant)
+        #expect(AppLanguage.resolve(preferredLanguages: ["zh-MO"], environment: emptyEnv) == .zhHant)
         #expect(AppLanguage.resolve(preferredLanguages: ["en-US"], environment: emptyEnv) == .en)
         #expect(AppLanguage.resolve(preferredLanguages: ["en-GB"], environment: emptyEnv) == .en)
         #expect(AppLanguage.resolve(preferredLanguages: ["fr-FR"], environment: emptyEnv) == .fr)
@@ -88,7 +93,7 @@ struct Tiny11CoreTests {
 
         // RTL 仅对阿拉伯语生效
         #expect(AppLanguage.ar.isRTL == true)
-        for nonRtl in [AppLanguage.zh, .en, .fr, .es, .ru] {
+        for nonRtl in [AppLanguage.zh, .zhHant, .en, .fr, .es, .ru] {
             #expect(nonRtl.isRTL == false)
         }
 
@@ -101,8 +106,14 @@ struct Tiny11CoreTests {
 
         // 环境变量显式覆盖测试支持
         #expect(AppLanguage.resolve(preferredLanguages: ["ja-JP"], environment: ["TINY11_LANG": "ru"]) == .ru)
+        #expect(AppLanguage.resolve(preferredLanguages: ["en-US"], environment: ["TINY11_LANG": "zh-Hant"]) == .zhHant)
 
-        // 验证全部 39 个清理规则与 UI/Core 文案在 6 种语言下均完整非空且无未翻译 ID 回退
+        // 验证繁体中文转换与全部 45 个清理规则及 UI/Core 文案在 7 种语言下均完整非空
+        L10n.withLanguage(.zhHant) {
+            #expect(BuildMode.macVM.title.contains("虛擬機器"))
+            #expect(L10n.tiny11EdgeToggleLabel().contains("精簡"))
+        }
+
         for lang in AppLanguage.allCases {
             L10n.withLanguage(lang) {
                 for cat in CleanupCategory.allCases {
@@ -196,6 +207,83 @@ struct Tiny11CoreTests {
         #expect(decodedLegacy.tiny11RemoveEdge == false)
     }
 
+    @Test("上游 v0.2.0 特性验证：经典安装器 ProductKey UI、6 项深度底层载荷裁剪、EdgeUpdate/WebView 卸载项清理及 cd700-custom.json 便携配方")
+    func upstreamV020FeaturesAndPortableRecipe() throws {
+        let dummyImg = WindowsImage(
+            index: 1, name: "Windows 11 Pro", description: "Windows 11 Pro",
+            architecture: .x64, major: 10, minor: 0, build: 26300, servicePackBuild: 9457,
+            editionId: "Professional", installationType: "Client", totalBytes: 16_000_000_000
+        )
+
+        // 1. 普通模式不写入 <ProductKey>，Core 或底层载荷移除模式写入 <WillShowUI>Always</WillShowUI>
+        let normalRecipe = BuildRecipe(mode: .macVM)
+        #expect(normalRecipe.requiresLegacySetup == false)
+        let normalXml = UnattendGenerator.generateXML(image: dummyImg, recipe: normalRecipe, includeSpecializeScript: false)
+        #expect(!normalXml.contains("<ProductKey>"))
+
+        let coreRecipe = BuildRecipe(mode: .tiny11Core, coreFlavor: true, coreAcknowledged: true)
+        #expect(coreRecipe.requiresLegacySetup == true)
+        let coreXml = UnattendGenerator.generateXML(image: dummyImg, recipe: coreRecipe, includeSpecializeScript: false)
+        #expect(coreXml.contains("<ProductKey>"))
+        #expect(coreXml.contains("<WillShowUI>Always</WillShowUI>"))
+
+        let customNativeRecipe = BuildRecipe(mode: .custom, selectedOptions: ["remove-wow64", "remove-print-drivers"])
+        #expect(customNativeRecipe.requiresLegacySetup == true)
+        let customNativeXml = UnattendGenerator.generateXML(image: dummyImg, recipe: customNativeRecipe, includeSpecializeScript: false)
+        #expect(customNativeXml.contains("<WillShowUI>Always</WillShowUI>"))
+
+        // 2. 6 项深度底层载荷与打印驱动包匹配裁剪验证
+        let sampleWimPaths = [
+            "/Windows/SysWOW64",
+            "/Windows/Microsoft.NET",
+            "/Windows/IME",
+            "/Windows/Speech",
+            "/Windows/Web",
+            "/Windows/System32/DriverStore/FileRepository/prnms001.inf_amd64_123456",
+            "/Windows/System32/DriverStore/FileRepository/scan_brother.inf_amd64_654321",
+            "/Windows/System32/DriverStore/FileRepository/stornvme.inf_amd64_999999"
+        ]
+        let allNativeRecipe = BuildRecipe(
+            mode: .custom,
+            selectedOptions: [
+                "remove-wow64", "remove-desktop-netfx", "remove-ime-files",
+                "remove-speech-files", "remove-print-drivers", "remove-extra-media"
+            ]
+        )
+        let nativePlan = try ImagePruner.buildPrunePlan(
+            allWimPaths: sampleWimPaths, image: dummyImg, recipe: allNativeRecipe, hasRegistryPending: false, log: { _ in }
+        )
+        #expect(nativePlan.deleteWimPaths.contains("/Windows/SysWOW64"))
+        #expect(nativePlan.deleteWimPaths.contains("/Windows/Microsoft.NET"))
+        #expect(nativePlan.deleteWimPaths.contains("/Windows/IME"))
+        #expect(nativePlan.deleteWimPaths.contains("/Windows/Speech"))
+        #expect(nativePlan.deleteWimPaths.contains("/Windows/Web"))
+        #expect(nativePlan.deleteWimPaths.contains("/Windows/System32/DriverStore/FileRepository/prnms001.inf_amd64_123456"))
+        #expect(nativePlan.deleteWimPaths.contains("/Windows/System32/DriverStore/FileRepository/scan_brother.inf_amd64_654321"))
+        #expect(!nativePlan.deleteWimPaths.contains("/Windows/System32/DriverStore/FileRepository/stornvme.inf_amd64_999999"))
+
+        // 3. 解析上游 recipes/cd700-custom.json 便携式配方
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let cd700URL = repoRoot.appendingPathComponent("recipes/cd700-custom.json")
+        if FileManager.default.fileExists(atPath: cd700URL.path) {
+            let cd700Data = try Data(contentsOf: cd700URL)
+            let cd700 = try JSONDecoder().decode(BuildRecipe.self, from: cd700Data)
+            #expect(cd700.mode == .custom)
+            #expect(cd700.coreFlavor == true)
+            #expect(cd700.coreAcknowledged == true)
+            #expect(cd700.shrinkBootImage == true)
+            #expect(cd700.isoSizeLimitBytes == 700_000_000)
+            #expect(cd700.omitNetFx3Payload == true)
+            #expect(cd700.selectedOptions.contains("remove-wow64"))
+            #expect(cd700.selectedOptions.contains("remove-print-drivers"))
+            #expect(!cd700.selectedOptions.contains("cleanup"))
+        }
+    }
+
     @Test("CHivex 离线注册表编辑器完整读写闭环测试")
     func offlineHiveEditorRoundtrip() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("tiny11-hive-test-\(UUID().uuidString)")
@@ -226,6 +314,26 @@ struct Tiny11CoreTests {
             )
             try soft.setValue(
                 keyPath: #"Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge"#,
+                name: "Publisher",
+                data: .string("Microsoft Corporation")
+            )
+            try soft.setValue(
+                keyPath: #"WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge Update"#,
+                name: "DisplayName",
+                data: .string("Microsoft Edge Update")
+            )
+            try soft.setValue(
+                keyPath: #"WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge Update"#,
+                name: "Publisher",
+                data: .string("Microsoft Corporation")
+            )
+            try soft.setValue(
+                keyPath: #"WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft EdgeWebView"#,
+                name: "DisplayName",
+                data: .string("Microsoft Edge WebView2 Runtime")
+            )
+            try soft.setValue(
+                keyPath: #"WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft EdgeWebView"#,
                 name: "Publisher",
                 data: .string("Microsoft Corporation")
             )
@@ -265,6 +373,8 @@ struct Tiny11CoreTests {
         #expect(try verifySoft.getDword(node: oobeNode, name: "BypassNRO") == 1)
         #expect(try verifySoft.findNode(path: #"Microsoft\Windows\CurrentVersion\Appx\AppxAllUserStore\Deprovisioned\Clipchamp.Clipchamp_yxz26nhyzhsrt"#) != nil)
         #expect(try verifySoft.findNode(path: #"Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge"#) == nil)
+        #expect(try verifySoft.findNode(path: #"WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge Update"#) == nil)
+        #expect(try verifySoft.findNode(path: #"WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft EdgeWebView"#) == nil)
 
         let verifySys = try HiveSession(path: sysPath, writable: false)
         defer { verifySys.close() }

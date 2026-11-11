@@ -1,9 +1,11 @@
 import Foundation
+import CoreFoundation
 
 /// Supported UI and engine languages for Tiny11 Builder for Mac.
 /// Follows macOS primary system language; falls back to `.en` for any unsupported language.
 public enum AppLanguage: String, CaseIterable, Codable, Sendable, Identifiable {
     case zh = "zh-Hans"
+    case zhHant = "zh-Hant"
     case en = "en"
     case fr = "fr"
     case es = "es"
@@ -23,8 +25,8 @@ public enum AppLanguage: String, CaseIterable, Codable, Sendable, Identifiable {
     }
 
     /// Resolves the active language from the system's primary preferred language.
-    /// If the primary language is not one of Chinese, English, French, Spanish, Russian, or Arabic,
-    /// always returns `.en` (English).
+    /// If the primary language is not one of Simplified Chinese, Traditional Chinese, English,
+    /// French, Spanish, Russian, or Arabic, always returns `.en` (English).
     public static func resolve(
         preferredLanguages: [String] = Locale.preferredLanguages,
         environment: [String: String] = ProcessInfo.processInfo.environment
@@ -44,12 +46,21 @@ public enum AppLanguage: String, CaseIterable, Codable, Sendable, Identifiable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
             .replacingOccurrences(of: "_", with: "-")
-        guard let primarySubtag = normalized.split(separator: "-").first.map(String.init),
-              !primarySubtag.isEmpty else {
+        let subtags = normalized.split(separator: "-").map(String.init)
+        guard let primarySubtag = subtags.first, !primarySubtag.isEmpty else {
             return .en
         }
         switch primarySubtag {
-        case "zh": return .zh
+        case "zh":
+            let traditionalMarkers: Set<String> = ["hant", "tw", "hk", "mo", "cht"]
+            if subtags.dropFirst().contains(where: { traditionalMarkers.contains($0) }) {
+                return .zhHant
+            }
+            return .zh
+        case "cht":
+            return .zhHant
+        case "chs":
+            return .zh
         case "en": return .en
         case "fr": return .fr
         case "es": return .es
@@ -89,10 +100,11 @@ public enum L10n {
         return try body()
     }
 
-    /// Compile-time exhaustive selector across all 6 supported languages.
+    /// Compile-time exhaustive selector across all 7 supported languages.
     public static func tr(
         lang: AppLanguage = L10n.currentLanguage,
         zh: String,
+        zhHant: String? = nil,
         en: String,
         fr: String,
         es: String,
@@ -101,12 +113,43 @@ public enum L10n {
     ) -> String {
         switch lang {
         case .zh: return zh
+        case .zhHant: return zhHant ?? toTraditionalChinese(zh)
         case .en: return en
         case .fr: return fr
         case .es: return es
         case .ru: return ru
         case .ar: return ar
         }
+    }
+
+    /// Converts Simplified Chinese text to Traditional Chinese using macOS ICU transform and regional IT terminology.
+    public static func toTraditionalChinese(_ simplified: String) -> String {
+        let mutable = NSMutableString(string: simplified)
+        CFStringTransform(mutable, nil, "Hans-Hant" as CFString, false)
+        var result = mutable as String
+        let terminologyReplacements: [(String, String)] = [
+            ("虛擬機", "虛擬機器"),
+            ("內存", "記憶體"),
+            ("默認", "預設"),
+            ("硬盤", "硬碟"),
+            ("磁盤", "磁碟"),
+            ("光盤", "光碟"),
+            ("原盤", "原光碟"),
+            ("文件夾", "資料夾"),
+            ("註冊表", "登錄檔"),
+            ("緩存", "快取"),
+            ("激活", "啟用"),
+            ("字節", "位元組"),
+            ("菜單", "選單"),
+            ("鏈接", "連結"),
+            ("組件", "元件"),
+            ("賬戶", "帳戶"),
+            ("網絡", "網路")
+        ]
+        for (src, dst) in terminologyReplacements {
+            result = result.replacingOccurrences(of: src, with: dst)
+        }
+        return result
     }
 
     public static func formatBytes(_ bytes: Int64, lang: AppLanguage = L10n.currentLanguage) -> String {

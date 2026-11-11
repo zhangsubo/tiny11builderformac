@@ -72,7 +72,7 @@ public final class MacBuildEngine: Sendable {
 
     public static func selectRecommendedIndex(from images: [WindowsImage]) -> Int {
         // WIM XML <EDITIONID> is language-neutral ("Professional"); also match localized Pro display names
-        let proKeywords = ["Windows 11 Pro", "专业版", "Professionnel", "Профессиональная"]
+        let proKeywords = ["Windows 11 Pro", "专业版", "專業版", "Professionnel", "Профессиональная"]
         if let pro = images.first(where: { img in
             img.editionId.caseInsensitiveCompare("Professional") == .orderedSame ||
             proKeywords.contains(where: { img.name.localizedCaseInsensitiveContains($0) })
@@ -181,7 +181,11 @@ public final class MacBuildEngine: Sendable {
                 throw Tiny11Error.invalidMedia(L10n.netFx3PayloadMissingError())
             }
 
-            try checkAvailableDiskSpace(at: workspaceRoot, requiredBytes: max(18 * 1024 * 1024 * 1024, targetImage.totalBytes + 8 * 1024 * 1024 * 1024))
+            let installAttrs = try? fm.attributesOfItem(atPath: installRel.fullPath)
+            let installFileBytes = (installAttrs?[.size] as? NSNumber)?.int64Value ?? 0
+            let effectiveSourceBytes = max(sourceTotalBytes, installFileBytes + 600 * 1024 * 1024)
+            let requiredWorkspaceBytes = max(Int64(10) * 1024 * 1024 * 1024, effectiveSourceBytes * 2)
+            try checkAvailableDiskSpace(at: workspaceRoot, requiredBytes: requiredWorkspaceBytes)
 
             let stagingDir = jobDir.appendingPathComponent("media", isDirectory: true)
             let stagingResult = try MediaStager.copyMedia(
@@ -309,14 +313,14 @@ public final class MacBuildEngine: Sendable {
             logger.log(L10n.logUnattendWritten(targetImage.architecture.unattendProcessorArchitecture))
 
             let stagedBootWim = stagingDir.appendingPathComponent(bootWimRel.relativePath).path
-            let legacyInstallerUsed = try await BootImageEditor.customizeBootWimIfNeeded(
+            let bootOutcome = try await BootImageEditor.customizeBootWimIfNeeded(
                 bootWimPath: stagedBootWim,
                 workTempDir: jobDir.path,
                 recipe: recipe,
                 wimClient: wimClient,
                 log: { logger.log($0) }
             )
-            finishPhase(.configureBoot, detail: L10n.phaseBootDone(legacyInstallerUsed: legacyInstallerUsed))
+            finishPhase(.configureBoot, detail: L10n.phaseBootDone(legacyInstallerUsed: bootOutcome.legacyInstallerUsed))
 
             // 6. 最终多核压缩导出至 staging/sources/install.(esd|wim)
             let destInstallLeaf = recipe.compression.installFileName
@@ -375,6 +379,12 @@ public final class MacBuildEngine: Sendable {
                 ))
             }
 
+            if let limit = recipe.isoSizeLimitBytes, isoBytes > limit {
+                throw Tiny11Error.validationFailed(
+                    L10n.isoSizeLimitExceededError(actualBytes: isoBytes, limitBytes: limit)
+                )
+            }
+
             let outputURL = URL(fileURLWithPath: recipe.outputPath).standardizedFileURL
             try fm.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             if fm.fileExists(atPath: outputURL.path) {
@@ -394,7 +404,10 @@ public final class MacBuildEngine: Sendable {
                 removedEntriesCount: prunePlan.deleteWimPaths.count,
                 deprovisionedAppsCount: hiveSummary.deprovisionedFamilies.count,
                 appliedPoliciesCount: hiveSummary.policiesWritten,
-                warnings: prunePlan.warnings
+                warnings: prunePlan.warnings,
+                bootImageBytesBefore: bootOutcome.bytesBefore,
+                bootImageBytesAfter: bootOutcome.bytesAfter,
+                isoSizeLimitBytes: recipe.isoSizeLimitBytes
             )
 
             try encoder.encode(result).write(to: URL(fileURLWithPath: result.reportPath))

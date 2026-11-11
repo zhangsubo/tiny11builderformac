@@ -238,13 +238,14 @@ public final class WimClient: Sendable {
         }
     }
 
-    /// 导出单个卷并按指定级别多核压缩（支持导出为工作 WIM 或最终 install.esd / install.wim）
+    /// 导出单个卷并按指定级别多核压缩（支持导出为工作 WIM、精简 boot.wim 或最终 install.esd / install.wim）
     public func export(
         sourceWim: String,
         sourceIndex: Int,
         destinationFile: String,
         compression: CompressionMode,
         checkIntegrity: Bool = true,
+        bootable: Bool = false,
         threads: Int = ProcessInfo.processInfo.activeProcessorCount,
         onOutput: (@Sendable (String, Double?) -> Void)? = nil
     ) async throws {
@@ -270,6 +271,9 @@ public final class WimClient: Sendable {
             args.append("--solid")
         }
 
+        if bootable {
+            args.append("--boot")
+        }
         if checkIntegrity {
             args.append("--check")
         }

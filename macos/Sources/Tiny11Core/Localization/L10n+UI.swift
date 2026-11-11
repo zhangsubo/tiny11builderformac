@@ -1074,12 +1074,108 @@ public extension L10n {
     static func workspacePathLabel(lang: AppLanguage = L10n.currentLanguage) -> String {
         tr(
             lang: lang,
-            zh: "构建临时工作目录（需至少约 20 GiB 可用空间，支持普通 APFS 分区）：",
-            en: "Temporary workspace directory (~20 GiB free space required, works on standard APFS volumes):",
-            fr: "Dossier temporaire de travail (~20 Gio libres requis, compatible APFS standard) :",
-            es: "Directorio temporal de trabajo (requiere ~20 GiB libres, compatible con APFS estándar):",
-            ru: "Временный рабочий каталог (требуется ~20 ГиБ свободного места, подходит обычный раздел APFS):",
-            ar: "مجلد العمل المؤقت (يتطلب نحو 20 غيغابايت متاحة ويدعم أقسام APFS العادية):"
+            zh: "构建临时工作目录（需源 ISO 体积 2 倍可用空间，约 10~15 GiB，支持普通 APFS 分区）：",
+            en: "Temporary workspace directory (requires ~2× source ISO size, ~10–15 GiB free, works on standard APFS):",
+            fr: "Dossier temporaire de travail (~2× la taille de l’ISO source requis, compatible APFS standard) :",
+            es: "Directorio temporal de trabajo (requiere ~2× el tamaño del ISO origen, compatible con APFS estándar):",
+            ru: "Временный рабочий каталог (требуется ~2× размера исходного ISO, подходит обычный раздел APFS):",
+            ar: "مجلد العمل المؤقت (يتطلب نحو ضعفي حجم ملف ISO الأصلي ويدعم أقسام APFS العادية):"
+        )
+    }
+
+    static func customOnlyBadge(lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "仅限自定义",
+            en: "Custom Only",
+            fr: "Custom seul",
+            es: "Solo Custom",
+            ru: "Только Custom",
+            ar: "مخصّص فقط"
+        )
+    }
+
+    static func shrinkBootImageTitle(lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "精简重建引导镜像 (Shrink boot.wim)",
+            en: "Rebuild Smaller Stock Boot Image (Shrink boot.wim)",
+            fr: "Reconstruire une image boot.wim plus compacte",
+            es: "Reconstruir imagen de arranque boot.wim reducida",
+            ru: "Пересобрать уменьшенный загрузочный образ (Shrink boot.wim)",
+            ar: "إعادة بناء صورة الإقلاع بحجم أصغر (Shrink boot.wim)"
+        )
+    }
+
+    static func shrinkBootImageSubtitle(lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "仅导出 boot.wim 中的 Windows Setup 引导卷并执行 LZX 最大压缩，完整保留图形安装界面与原生存储驱动。",
+            en: "Rebuilds boot.wim as a single maximum-compressed bootable Setup index while retaining the GUI installer and native drivers.",
+            fr: "Reconstruit boot.wim en un seul index Setup amorçable à compression maximale tout en conservant l’interface et les pilotes.",
+            es: "Reconstruye boot.wim como un único índice Setup arrancable con compresión máxima manteniendo interfaz y controladores.",
+            ru: "Пересобирает boot.wim с одним загрузочным индексом Setup и максимальным сжатием LZX, сохраняя GUI и драйверы.",
+            ar: "يعيد بناء boot.wim كفهرس إعداد واحد قابل للإقلاع بأقصى ضغط مع الحفاظ على الواجهة الرسومية والتعريفات."
+        )
+    }
+
+    static func isoSizeLimitBoxTitle(_ limitFormatted: String, lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "配方体积预算上限：\(limitFormatted)",
+            en: "Recipe ISO Size Budget: \(limitFormatted)",
+            fr: "Budget de taille ISO de la recette : \(limitFormatted)",
+            es: "Límite de tamaño ISO de la receta: \(limitFormatted)",
+            ru: "Лимит размера ISO из рецепта: \(limitFormatted)",
+            ar: "حد حجم ملف ISO في الوصفة: \(limitFormatted)"
+        )
+    }
+
+    static func isoSizeLimitSubtitle(lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "当前导入的配方设定了成品 ISO 字节上限（如 CD 700MB 极限配方）。若无需严格限制体积，可点击右侧移除。",
+            en: "The imported recipe enforces a strict maximum byte budget on the output ISO. Click Remove Limit if you do not need this constraint.",
+            fr: "La recette importée impose une taille maximale stricte pour l’ISO final. Cliquez à droite pour lever cette limite.",
+            es: "La receta importada impone un tamaño máximo estricto al ISO final. Haz clic a la derecha para quitar este límite.",
+            ru: "Импортированный рецепт задаёт строгий лимит размера выходного ISO. Нажмите кнопку справа, чтобы снять ограничение.",
+            ar: "تفرض الوصفة المستوردة حدًا أقصى صارمًا لحجم ملف ISO الناتج. انقر لإزالة هذا القيد إذا لم تكن بحاجة إليه."
+        )
+    }
+
+    static func clearLimitButton(lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "移除体积限制",
+            en: "Remove Limit",
+            fr: "Retirer la limite",
+            es: "Quitar límite",
+            ru: "Снять лимит",
+            ar: "إزالة الحد"
+        )
+    }
+
+    static func reviewShrinkBootLabel(lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "精简 boot.wim",
+            en: "Shrink boot.wim",
+            fr: "Réduire boot.wim",
+            es: "Reducir boot.wim",
+            ru: "Сжатие boot.wim",
+            ar: "تقليص boot.wim"
+        )
+    }
+
+    static func reviewIsoLimitLabel(lang: AppLanguage = L10n.currentLanguage) -> String {
+        tr(
+            lang: lang,
+            zh: "体积预算上限",
+            en: "ISO Size Limit",
+            fr: "Limite taille ISO",
+            es: "Límite tamaño ISO",
+            ru: "Лимит размера ISO",
+            ar: "حد حجم ISO"
         )
     }
 

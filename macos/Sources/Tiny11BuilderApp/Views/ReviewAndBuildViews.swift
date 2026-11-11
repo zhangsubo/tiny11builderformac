@@ -49,10 +49,14 @@ struct ReviewView: View {
                     ReviewRow(label: L10n.reviewCompressionLabel(), value: vm.recipe.compression.title)
                     ReviewRow(label: L10n.reviewLocalAccountLabel(), value: L10n.reviewLocalAccountValue(vm.recipe.preferLocalAccount))
                     ReviewRow(label: L10n.reviewCompactOsLabel(), value: L10n.reviewOnOffValue(vm.recipe.compactInstallation))
+                    ReviewRow(label: L10n.reviewShrinkBootLabel(), value: L10n.reviewOnOffValue(vm.recipe.shrinkBootImage))
                     ReviewRow(
                         label: L10n.reviewNetFx3Label(),
                         value: L10n.reviewNetFx3Value(enable: vm.recipe.enableNetFx3, omitPayload: vm.recipe.omitNetFx3Payload)
                     )
+                    if let limit = vm.recipe.isoSizeLimitBytes {
+                        ReviewRow(label: L10n.reviewIsoLimitLabel(), value: L10n.formatBytes(limit))
+                    }
                 }
 
                 ReviewCard(title: L10n.reviewPathsCardTitle(), icon: "folder") {
