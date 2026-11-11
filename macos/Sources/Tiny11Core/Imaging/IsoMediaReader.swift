@@ -20,7 +20,7 @@ public final class IsoMediaReader: Sendable {
         let standardized = URL(fileURLWithPath: sourcePath).standardizedFileURL.path
         var isDir: ObjCBool = false
         guard fm.fileExists(atPath: standardized, isDirectory: &isDir) else {
-            throw Tiny11Error.invalidMedia("找不到指定的镜像文件或目录：\(standardized)")
+            throw Tiny11Error.invalidMedia(L10n.mediaSourceNotFound(standardized))
         }
 
         if isDir.boolValue {
@@ -28,7 +28,7 @@ public final class IsoMediaReader: Sendable {
         }
 
         guard standardized.lowercased().hasSuffix(".iso") else {
-            throw Tiny11Error.invalidMedia("请选择有效的 Windows 11 .iso 文件或已解压的安装目录。")
+            throw Tiny11Error.invalidMedia(L10n.mediaInvalidExtension())
         }
 
         try IsoValidator.validateISO(at: standardized)
@@ -67,7 +67,7 @@ public final class IsoMediaReader: Sendable {
 
         guard let plist = try? PropertyListSerialization.propertyList(from: result.stdout, options: [], format: nil) as? [String: Any],
               let entities = plist["system-entities"] as? [[String: Any]] else {
-            throw Tiny11Error.invalidMedia("无法解析 hdiutil 挂载返回信息。")
+            throw Tiny11Error.invalidMedia(L10n.hdiutilParseError())
         }
 
         for entity in entities {
@@ -77,7 +77,7 @@ public final class IsoMediaReader: Sendable {
             }
         }
 
-        throw Tiny11Error.invalidMedia("ISO 已附加，但 macOS 未能挂载可读文件系统卷。")
+        throw Tiny11Error.invalidMedia(L10n.hdiutilNoReadableVolume())
     }
 
     public func close(_ media: OpenedMedia) async {

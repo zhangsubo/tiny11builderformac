@@ -9,34 +9,15 @@ public enum BuildMode: String, Codable, CaseIterable, Sendable, Identifiable {
     public var id: String { rawValue }
 
     public var title: String {
-        switch self {
-        case .macVM: return "Tiny11 · Mac 虚拟机优化版"
-        case .tiny11: return "Tiny11 · 标准精简版"
-        case .tiny11Core: return "Tiny11 Core · 极限测试版"
-        case .custom: return "Custom · 自定义构建"
-        }
+        L10n.buildModeTitle(self)
     }
 
     public var badge: String? {
-        switch self {
-        case .macVM: return "推荐 · Parallels / Fusion / UTM"
-        case .tiny11: return "PC 装机通用"
-        case .tiny11Core: return "不可更新 · 仅限测试"
-        case .custom: return "按需勾选"
-        }
+        L10n.buildModeBadge(self)
     }
 
     public var summary: String {
-        switch self {
-        case .macVM:
-            return "专为 Apple Silicon 虚拟机调优：移除 20+ 预装臃肿应用与广告遥测，自动绕过 TPM/内存限制与 OOBE 无网卡强制联网死锁，关闭自动加密与预留空间（立省约 7GB 虚拟磁盘），完整保留 Guest Tools 驱动与系统更新能力。"
-        case .tiny11:
-            return "复刻原版 Tiny11 规则：彻底移除预装应用、Edge/WebView2 及 OneDrive 安装程序，保留 Windows Update、Defender 与系统恢复能力。"
-        case .tiny11Core:
-            return "在标准版基础上进一步裁剪 WinSxS 组件库、移除 WinRE 恢复镜像并禁用 Windows Update 与 Defender。体积最小，但安装后无法打补丁或添加功能。"
-        case .custom:
-            return "从空白方案起步，自由勾选要移除的预装应用、可选功能、系统文件、隐私策略以及是否启用 Core 级深度组件裁剪。"
-        }
+        L10n.buildModeSummary(self)
     }
 
     public var isCoreFlavor: Bool {
@@ -52,19 +33,11 @@ public enum CompressionMode: String, Codable, CaseIterable, Sendable, Identifiab
     public var id: String { rawValue }
 
     public var title: String {
-        switch self {
-        case .recoveryESD: return "极限固态压缩 (Recovery ESD)"
-        case .maximumWIM: return "高压缩可挂载 (Maximum WIM)"
-        case .fastWIM: return "极速构建 (Fast WIM)"
-        }
+        L10n.compressionTitle(self)
     }
 
     public var subtitle: String {
-        switch self {
-        case .recoveryESD: return "输出 install.esd（LZMS 固态压缩），ISO 体积最小（约 2.8~3.3 GiB），多核全力加速但耗时较长。"
-        case .maximumWIM: return "输出 install.wim（LZX 压缩），兼顾较小体积与后续二次离线维护。"
-        case .fastWIM: return "输出 install.wim（XPRESS 快速压缩），打包速度最快，适合本地虚拟机快速装机验证。"
-        }
+        L10n.compressionSubtitle(self)
     }
 
     public var installFileName: String {
@@ -77,10 +50,7 @@ public enum ImageArchitecture: String, Codable, Sendable, CaseIterable {
     case x64 = "x64"
 
     public var displayName: String {
-        switch self {
-        case .arm64: return "ARM64 (Apple Silicon 虚拟机原生架构)"
-        case .x64: return "x64 / AMD64 (Intel/AMD PC 架构)"
-        }
+        L10n.architectureDisplayName(self)
     }
 
     public var unattendProcessorArchitecture: String {
@@ -134,20 +104,36 @@ public struct PolicyValue: Codable, Sendable, Equatable {
 
 public struct CleanupOption: Codable, Sendable, Equatable, Identifiable {
     public let id: String
-    public let title: String
-    public let description: String
-    public let category: String
+    public let categoryId: CleanupCategory
     public let kind: OptionKind
     public let macVMDefault: Bool
     public let tiny11Default: Bool
     public let coreDefault: Bool
     public let targets: [String]
 
+    public var title: String {
+        L10n.optionCopy(for: id).title
+    }
+
+    public var description: String {
+        L10n.optionCopy(for: id).description
+    }
+
+    public var category: String {
+        categoryId.title
+    }
+
+    public func title(in lang: AppLanguage) -> String {
+        L10n.optionCopy(for: id, lang: lang).title
+    }
+
+    public func description(in lang: AppLanguage) -> String {
+        L10n.optionCopy(for: id, lang: lang).description
+    }
+
     public init(
         id: String,
-        title: String,
-        description: String,
-        category: String,
+        categoryId: CleanupCategory,
         kind: OptionKind,
         macVMDefault: Bool,
         tiny11Default: Bool,
@@ -155,9 +141,7 @@ public struct CleanupOption: Codable, Sendable, Equatable, Identifiable {
         targets: [String] = []
     ) {
         self.id = id
-        self.title = title
-        self.description = description
-        self.category = category
+        self.categoryId = categoryId
         self.kind = kind
         self.macVMDefault = macVMDefault
         self.tiny11Default = tiny11Default
@@ -227,7 +211,7 @@ public struct WindowsImage: Codable, Sendable, Equatable, Identifiable {
     public func validate() throws {
         guard isSupported else {
             throw Tiny11Error.unsupportedImage(
-                "仅支持 Windows 11 客户端镜像（Build 22621 / 22H2 及以上，ARM64 或 x64）。当前镜像为 \(name) (Build \(build), \(installationType))。"
+                L10n.unsupportedImageError(name: name, build: build, installationType: installationType)
             )
         }
     }
@@ -277,6 +261,7 @@ public struct BuildRecipe: Codable, Sendable, Equatable {
     public var workspacePath: String
     public var outputPath: String
     public var mode: BuildMode
+    public var tiny11RemoveEdge: Bool
     public var coreFlavor: Bool
     public var coreAcknowledged: Bool
     public var compression: CompressionMode
@@ -294,10 +279,11 @@ public struct BuildRecipe: Codable, Sendable, Equatable {
         workspacePath: String = BuildRecipe.defaultWorkspacePath(),
         outputPath: String = "",
         mode: BuildMode = .macVM,
+        tiny11RemoveEdge: Bool = true,
         coreFlavor: Bool = false,
         coreAcknowledged: Bool = false,
         compression: CompressionMode = .recoveryESD,
-        selectedOptions: [String] = CleanupCatalog.optionIds(for: .macVM),
+        selectedOptions: [String]? = nil,
         enableNetFx3: Bool = false,
         compactInstallation: Bool = true,
         preferLocalAccount: Bool = true,
@@ -310,16 +296,61 @@ public struct BuildRecipe: Codable, Sendable, Equatable {
         self.workspacePath = workspacePath
         self.outputPath = outputPath
         self.mode = mode
+        self.tiny11RemoveEdge = tiny11RemoveEdge
         self.coreFlavor = coreFlavor
         self.coreAcknowledged = coreAcknowledged
         self.compression = compression
-        self.selectedOptions = selectedOptions
+        self.selectedOptions = selectedOptions ?? CleanupCatalog.optionIds(for: mode, tiny11RemoveEdge: tiny11RemoveEdge)
         self.enableNetFx3 = enableNetFx3
         self.compactInstallation = compactInstallation
         self.preferLocalAccount = preferLocalAccount
         self.removeRedundantData = removeRedundantData
         self.omitNetFx3Payload = omitNetFx3Payload
         self.keepWorkingFiles = keepWorkingFiles
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case sourcePath
+        case imageIndex
+        case workspacePath
+        case outputPath
+        case mode
+        case tiny11RemoveEdge
+        case coreFlavor
+        case coreAcknowledged
+        case compression
+        case selectedOptions
+        case enableNetFx3
+        case compactInstallation
+        case preferLocalAccount
+        case removeRedundantData
+        case omitNetFx3Payload
+        case keepWorkingFiles
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        self.sourcePath = try container.decode(String.self, forKey: .sourcePath)
+        self.imageIndex = try container.decode(Int.self, forKey: .imageIndex)
+        self.workspacePath = try container.decode(String.self, forKey: .workspacePath)
+        self.outputPath = try container.decode(String.self, forKey: .outputPath)
+        let decodedMode = try container.decode(BuildMode.self, forKey: .mode)
+        self.mode = decodedMode
+        let decodedOptions = try container.decode([String].self, forKey: .selectedOptions)
+        self.selectedOptions = decodedOptions
+        self.tiny11RemoveEdge = try container.decodeIfPresent(Bool.self, forKey: .tiny11RemoveEdge)
+            ?? (decodedMode == .tiny11 ? decodedOptions.contains("edge-files") : true)
+        self.coreFlavor = try container.decode(Bool.self, forKey: .coreFlavor)
+        self.coreAcknowledged = try container.decode(Bool.self, forKey: .coreAcknowledged)
+        self.compression = try container.decode(CompressionMode.self, forKey: .compression)
+        self.enableNetFx3 = try container.decode(Bool.self, forKey: .enableNetFx3)
+        self.compactInstallation = try container.decode(Bool.self, forKey: .compactInstallation)
+        self.preferLocalAccount = try container.decode(Bool.self, forKey: .preferLocalAccount)
+        self.removeRedundantData = try container.decode(Bool.self, forKey: .removeRedundantData)
+        self.omitNetFx3Payload = try container.decode(Bool.self, forKey: .omitNetFx3Payload)
+        self.keepWorkingFiles = try container.decode(Bool.self, forKey: .keepWorkingFiles)
     }
 
     public static func defaultWorkspacePath() -> String {
@@ -334,35 +365,35 @@ public struct BuildRecipe: Codable, Sendable, Equatable {
 
     public func validate() throws {
         guard schemaVersion == 1 else {
-            throw Tiny11Error.validationFailed("不支持的配方版本：\(schemaVersion)。")
+            throw Tiny11Error.validationFailed(L10n.unsupportedSchemaError(schemaVersion))
         }
         guard !sourcePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw Tiny11Error.validationFailed("请先选择有效的 Windows 11 ISO 文件或解压后的安装目录。")
+            throw Tiny11Error.validationFailed(L10n.emptySourcePathError())
         }
         guard imageIndex >= 1 else {
-            throw Tiny11Error.validationFailed("镜像版本索引无效：\(imageIndex)。")
+            throw Tiny11Error.validationFailed(L10n.invalidImageIndexError(imageIndex))
         }
         guard !workspacePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw Tiny11Error.validationFailed("请指定有效的工作缓存目录。")
+            throw Tiny11Error.validationFailed(L10n.emptyWorkspacePathError())
         }
         guard !outputPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               outputPath.lowercased().hasSuffix(".iso") else {
-            throw Tiny11Error.validationFailed("输出路径必须是新的 .iso 文件路径。")
+            throw Tiny11Error.validationFailed(L10n.invalidOutputPathError())
         }
         if FileManager.default.fileExists(atPath: outputPath) {
-            throw Tiny11Error.validationFailed("输出 ISO 文件已存在（不会覆盖已有文件）：\(outputPath)")
+            throw Tiny11Error.validationFailed(L10n.outputFileAlreadyExistsError(outputPath))
         }
         let cleanSource = URL(fileURLWithPath: sourcePath).standardizedFileURL.path
         let cleanOutput = URL(fileURLWithPath: outputPath).standardizedFileURL.path
         if cleanSource == cleanOutput {
-            throw Tiny11Error.validationFailed("输出文件不能与源镜像路径相同。")
+            throw Tiny11Error.validationFailed(L10n.outputSameAsSourceError())
         }
         if effectiveCore && !coreAcknowledged {
-            throw Tiny11Error.validationFailed("使用 Tiny11 Core 裁剪必须先确认已知悉失去系统更新、恢复环境与 Defender 防护的风险。")
+            throw Tiny11Error.validationFailed(L10n.coreNotAcknowledgedError())
         }
         let validIds = Set(CleanupCatalog.options.map(\.id))
         for optionId in selectedOptions where !validIds.contains(optionId) {
-            throw Tiny11Error.validationFailed("包含未知的清理选项 ID：\(optionId)")
+            throw Tiny11Error.validationFailed(L10n.unknownOptionIdError(optionId))
         }
     }
 }
@@ -389,16 +420,7 @@ public enum BuildPhaseId: String, Codable, CaseIterable, Sendable, Identifiable 
     public var id: String { rawValue }
 
     public var title: String {
-        switch self {
-        case .prepareMedia: return "1. 解包与暂存安装介质"
-        case .exportEdition: return "2. 导出单版本工作镜像"
-        case .modifyRegistry: return "3. 注入离线注册表策略与防重装锁"
-        case .pruneImage: return "4. 流式裁剪预装应用与冗余文件"
-        case .configureBoot: return "5. 配置应答文件与引导环境"
-        case .compressImage: return "6. 多核压缩最终系统镜像"
-        case .createISO: return "7. 封装 UEFI/UDF 可引导 ISO"
-        case .verifyOutput: return "8. 校验结构与生成报告"
-        }
+        L10n.buildPhaseTitle(self)
     }
 
     public var symbolName: String {
@@ -492,7 +514,7 @@ public enum Tiny11Error: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .toolMissing(let detail):
-            return "缺少必要的底层镜像工具：\(detail)"
+            return L10n.toolMissingError(detail)
         case .validationFailed(let detail):
             return detail
         case .unsupportedImage(let detail):
@@ -502,11 +524,15 @@ public enum Tiny11Error: LocalizedError, Sendable {
         case .processFailed(let executable, let exitCode, let output):
             let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
             let suffix = trimmed.isEmpty ? "" : "\n\(trimmed.suffix(600))"
-            return "命令执行失败 (\(URL(fileURLWithPath: executable).lastPathComponent), 退出码 \(exitCode))。\(suffix)"
+            return L10n.processFailedError(
+                execName: URL(fileURLWithPath: executable).lastPathComponent,
+                exitCode: exitCode,
+                suffix: suffix
+            )
         case .registryError(let detail):
-            return "离线注册表操作失败：\(detail)"
+            return L10n.registryError(detail)
         case .cancelled:
-            return "操作已安全取消。"
+            return L10n.cancelledError()
         }
     }
 }

@@ -6,19 +6,19 @@ public enum IsoValidator {
     public static func validateISO(at path: String) throws {
         let url = URL(fileURLWithPath: path)
         guard FileManager.default.fileExists(atPath: path) else {
-            throw Tiny11Error.invalidMedia("ISO 文件不存在：\(path)")
+            throw Tiny11Error.invalidMedia(L10n.isoFileNotFound(path))
         }
         let attrs = try FileManager.default.attributesOfItem(atPath: path)
         let length = (attrs[.size] as? NSNumber)?.int64Value ?? 0
         guard length >= 34816, length % 2048 == 0 else {
-            throw Tiny11Error.invalidMedia("文件大小不符合标准 ISO 扇区对齐格式（\(length) 字节）。")
+            throw Tiny11Error.invalidMedia(L10n.isoInvalidSectorSize(length))
         }
 
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         try handle.seek(toOffset: 2048 * 16)
         guard let descriptor = try handle.read(upToCount: 2048 * 16), descriptor.count >= 6 else {
-            throw Tiny11Error.invalidMedia("无法读取 ISO 卷描述符区域。")
+            throw Tiny11Error.invalidMedia(L10n.isoDescriptorReadError())
         }
 
         let validMarkers: Set<String> = ["CD001", "BEA01", "NSR02", "NSR03"]
@@ -30,7 +30,7 @@ public enum IsoValidator {
             }
             offset += 2048
         }
-        throw Tiny11Error.invalidMedia("未检测到有效的 ISO9660 或 UDF 卷描述符（非标准光盘镜像）。")
+        throw Tiny11Error.invalidMedia(L10n.isoInvalidVolumeDescriptor())
     }
 
     /// 流式计算大文件 SHA-256，支持取消与进度回调

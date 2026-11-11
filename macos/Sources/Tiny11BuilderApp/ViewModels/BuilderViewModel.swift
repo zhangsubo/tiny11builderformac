@@ -14,25 +14,11 @@ public enum WizardStep: Int, CaseIterable, Identifiable, Sendable {
     public var id: Int { rawValue }
 
     public var title: String {
-        switch self {
-        case .mode: return "构建模式"
-        case .source: return "导入镜像"
-        case .customize: return "精简定制"
-        case .settings: return "压缩与参数"
-        case .review: return "方案复核"
-        case .build: return "执行构建"
-        }
+        L10n.wizardStepTitle(rawValue)
     }
 
     public var subtitle: String {
-        switch self {
-        case .mode: return "选择面向 Mac 虚拟机或 PC 装机的精简预设"
-        case .source: return "拖入或选择本地 Windows 11 ARM64 / x64 ISO 镜像"
-        case .customize: return "查看或按需调整要移除的应用、组件与隐私策略"
-        case .settings: return "配置镜像压缩等级、OOBE 断网直通与输出路径"
-        case .review: return "核对所有变更项并确认开始制作"
-        case .build: return "实时查看八阶段流式裁剪与封装进度"
-        }
+        L10n.wizardStepSubtitle(rawValue)
     }
 
     public var iconName: String {
@@ -60,12 +46,12 @@ public final class StageStatusRow: Identifiable {
 
     public init(phase: BuildPhaseId) {
         self.phase = phase
-        self.message = "等待执行"
+        self.message = L10n.stageWaiting()
     }
 
     public func reset() {
         state = .pending
-        message = "等待执行"
+        message = L10n.stageWaiting()
         percent = nil
         detail = nil
     }
@@ -74,13 +60,14 @@ public final class StageStatusRow: Identifiable {
 @MainActor
 @Observable
 public final class BuilderViewModel {
+    public let language: AppLanguage = L10n.currentLanguage
     public var currentStep: WizardStep = .mode
     public var maxReachedStep: Int = 0
 
     // 构建配方状态
     public var recipe: BuildRecipe = BuildRecipe()
     public var searchQuery: String = ""
-    public var selectedCategory: String = "全部"
+    public var selectedCategory: CleanupCategory? = nil
 
     // 源镜像解析状态
     public var isInspecting: Bool = false
@@ -121,8 +108,8 @@ public final class BuilderViewModel {
             let loc = try BundledToolLocator.locate()
             toolsAvailable = true
             toolStatusText = loc.bundledMode
-                ? "内置原生引擎就绪 (wimlib + libhivex + mkisofs)"
-                : "开发环境原生引擎就绪 (Homebrew ARM64)"
+                ? L10n.toolStatusBundled()
+                : L10n.toolStatusDev()
         } catch {
             toolsAvailable = false
             toolStatusText = error.localizedDescription
@@ -191,7 +178,10 @@ public final class BuilderViewModel {
             recipe.coreFlavor = false
         }
         if mode != .custom {
-            recipe.selectedOptions = CleanupCatalog.optionIds(for: mode)
+            recipe.selectedOptions = CleanupCatalog.optionIds(
+                for: mode,
+                tiny11RemoveEdge: recipe.tiny11RemoveEdge
+            )
         }
         if mode == .macVM {
             recipe.preferLocalAccount = true
@@ -199,6 +189,20 @@ public final class BuilderViewModel {
             recipe.removeRedundantData = true
         }
         updateDefaultOutputPath()
+    }
+
+    public func setTiny11RemoveEdge(_ removeEdge: Bool, selectModeIfOnModeStep: Bool = false) {
+        recipe.tiny11RemoveEdge = removeEdge
+        if selectModeIfOnModeStep && currentStep == .mode && recipe.mode != .tiny11 {
+            applyMode(.tiny11)
+            return
+        }
+        if recipe.mode == .tiny11 {
+            recipe.selectedOptions = CleanupCatalog.optionIds(
+                for: .tiny11,
+                tiny11RemoveEdge: removeEdge
+            )
+        }
     }
 
     public func confirmCoreRisk() {
@@ -239,7 +243,11 @@ public final class BuilderViewModel {
     }
 
     public func toggleOption(_ id: String, isOn: Bool) {
-        // 若用户在预设模式下手动改动开关，自动平滑转为 Custom 模式并保留原有勾选项
+        if recipe.mode == .tiny11 && id == "edge-files" {
+            setTiny11RemoveEdge(isOn)
+            return
+        }
+        // 若用户在预设模式下手动改动其他开关，自动平滑转为 Custom 模式并保留原有勾选项
         if recipe.mode != .custom {
             recipe.coreFlavor = (recipe.mode == .tiny11Core)
             recipe.mode = .custom
@@ -255,7 +263,7 @@ public final class BuilderViewModel {
 
     public var filteredOptions: [CleanupOption] {
         CleanupCatalog.options.filter { opt in
-            let matchCategory = (selectedCategory == "全部" || opt.category == selectedCategory)
+            let matchCategory = (selectedCategory == nil || opt.categoryId == selectedCategory)
             let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
             let matchQuery = q.isEmpty
                 || opt.title.localizedCaseInsensitiveContains(q)
@@ -288,7 +296,7 @@ public final class BuilderViewModel {
 
     public func pickSourceISO() {
         let panel = NSOpenPanel()
-        panel.title = "选择 Windows 11 官方 ISO 镜像或解压目录"
+        panel.title = L10n.pickSourcePanelTitle()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
@@ -310,11 +318,7 @@ public final class BuilderViewModel {
             do {
                 let result = try await engine.inspectMedia(sourcePath: path)
                 self.inspection = result
-                if result.images.contains(where: { $0.index == self.recipe.imageIndex }) == false {
-                    self.recipe.imageIndex = result.recommendedIndex
-                } else {
-                    self.recipe.imageIndex = result.recommendedIndex
-                }
+                self.recipe.imageIndex = result.recommendedIndex
                 if !result.hasNetFx3Payload {
                     self.recipe.enableNetFx3 = false
                 }
@@ -329,7 +333,7 @@ public final class BuilderViewModel {
 
     public func pickOutputISO() {
         let panel = NSSavePanel()
-        panel.title = "选择精简版 ISO 保存位置"
+        panel.title = L10n.pickOutputPanelTitle()
         let currentURL = URL(fileURLWithPath: recipe.outputPath)
         panel.nameFieldStringValue = currentURL.lastPathComponent.isEmpty ? "Tiny11-Mac.iso" : currentURL.lastPathComponent
         panel.directoryURL = currentURL.deletingLastPathComponent()
@@ -344,7 +348,7 @@ public final class BuilderViewModel {
 
     public func pickWorkspaceFolder() {
         let panel = NSOpenPanel()
-        panel.title = "选择构建临时工作缓存目录"
+        panel.title = L10n.pickWorkspacePanelTitle()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
@@ -371,7 +375,7 @@ public final class BuilderViewModel {
 
     public func exportRecipe() {
         let panel = NSSavePanel()
-        panel.title = "导出 Tiny11 构建配方 (.json)"
+        panel.title = L10n.exportRecipePanelTitle()
         panel.nameFieldStringValue = "tiny11-recipe.json"
         if panel.runModal() == .OK, let url = panel.url {
             do {
@@ -379,16 +383,16 @@ public final class BuilderViewModel {
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
                 let data = try encoder.encode(recipe)
                 try data.write(to: url)
-                showBanner("构建配方已保存至 \(url.lastPathComponent)", isError: false)
+                showBanner(L10n.recipeExportedBanner(url.lastPathComponent), isError: false)
             } catch {
-                showBanner("保存配方失败：\(error.localizedDescription)", isError: true)
+                showBanner(L10n.recipeExportFailedBanner(error.localizedDescription), isError: true)
             }
         }
     }
 
     public func importRecipe() {
         let panel = NSOpenPanel()
-        panel.title = "导入 Tiny11 构建配方 (.json)"
+        panel.title = L10n.importRecipePanelTitle()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
@@ -400,9 +404,9 @@ public final class BuilderViewModel {
                 if !loaded.sourcePath.isEmpty && FileManager.default.fileExists(atPath: loaded.sourcePath) {
                     loadSource(url: URL(fileURLWithPath: loaded.sourcePath))
                 }
-                showBanner("已导入配方：\(url.lastPathComponent)", isError: false)
+                showBanner(L10n.recipeImportedBanner(url.lastPathComponent), isError: false)
             } catch {
-                showBanner("导入配方失败：\(error.localizedDescription)", isError: true)
+                showBanner(L10n.recipeImportFailedBanner(error.localizedDescription), isError: true)
             }
         }
     }
@@ -457,8 +461,9 @@ public final class BuilderViewModel {
                 self.buildError = error.localizedDescription
                 self.isBuilding = false
                 self.cancelRequested = false
+                let wasCancelled = (error as? Tiny11Error)?.isCancelledError == true || error is CancellationError
                 for row in self.stageRows where row.state == .running {
-                    row.state = (error is Tiny11Error && error.localizedDescription.contains("取消")) ? .cancelled : .failed
+                    row.state = wasCancelled ? .cancelled : .failed
                 }
             }
         }
@@ -467,7 +472,7 @@ public final class BuilderViewModel {
     public func cancelBuild() {
         guard isBuilding, !cancelRequested else { return }
         cancelRequested = true
-        appendLog("正在安全中止当前子进程并清理挂载点...")
+        appendLog(L10n.cancelBuildLogLine())
         buildTask?.cancel()
     }
 
@@ -483,7 +488,7 @@ public final class BuilderViewModel {
     public func copyToPasteboard(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-        showBanner("已复制到剪贴板", isError: false)
+        showBanner(L10n.copiedToClipboardBanner(), isError: false)
     }
 
     private func handleProgress(_ event: BuildProgressEvent) {

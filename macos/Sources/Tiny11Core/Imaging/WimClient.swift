@@ -47,7 +47,7 @@ public final class WimClient: Sendable {
 
     public static func parseWimXml(_ rawData: Data) throws -> [WindowsImage] {
         guard !rawData.isEmpty else {
-            throw Tiny11Error.invalidMedia("WIM XML 元数据为空。")
+            throw Tiny11Error.invalidMedia(L10n.wimXmlEmpty())
         }
 
         let xmlString: String
@@ -70,7 +70,7 @@ public final class WimClient: Sendable {
 
         let doc = try XMLDocument(xmlString: sanitized, options: [])
         guard let root = doc.rootElement() else {
-            throw Tiny11Error.invalidMedia("无法解析 WIM XML 根节点。")
+            throw Tiny11Error.invalidMedia(L10n.wimXmlRootParseError())
         }
 
         let imageElements = root.elements(forName: "IMAGE")
@@ -145,7 +145,7 @@ public final class WimClient: Sendable {
         }
 
         if images.isEmpty {
-            throw Tiny11Error.invalidMedia("该 WIM/ESD 文件中未找到任何可用的系统卷。")
+            throw Tiny11Error.invalidMedia(L10n.wimNoSystemVolumes())
         }
         return images.sorted(by: { $0.index < $1.index })
     }

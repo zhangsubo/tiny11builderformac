@@ -13,9 +13,9 @@ struct ModeSelectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("选择你的 Windows 11 精简模式")
+                Text(L10n.modeViewTitle())
                     .font(.title2.bold())
-                Text("在 Apple Silicon Mac 上无需虚拟机、无需管理员密码，流式裁剪并生成干净轻量的可引导 ISO。")
+                Text(L10n.modeViewSubtitle())
                     .foregroundStyle(.secondary)
             }
 
@@ -24,6 +24,10 @@ struct ModeSelectionView: View {
                     ModeCard(
                         mode: mode,
                         isSelected: vm.recipe.mode == mode,
+                        tiny11RemoveEdge: mode == .tiny11 ? Binding(
+                            get: { vm.recipe.tiny11RemoveEdge },
+                            set: { vm.setTiny11RemoveEdge($0, selectModeIfOnModeStep: true) }
+                        ) : nil,
                         action: { vm.chooseModeCard(mode) }
                     )
                 }
@@ -37,7 +41,7 @@ struct ModeSelectionView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(vm.toolStatusText)
                             .font(.subheadline.weight(.medium))
-                        Text("全程在用户态直接操作 WIM 归档与离线注册表二进制文件，100% 隔离宿主机 macOS 系统。")
+                        Text(L10n.engineIsolationCaption())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -52,6 +56,7 @@ struct ModeSelectionView: View {
 private struct ModeCard: View {
     let mode: BuildMode
     let isSelected: Bool
+    let tiny11RemoveEdge: Binding<Bool>?
     let action: () -> Void
 
     private var accentColor: Color {
@@ -73,60 +78,88 @@ private struct ModeCard: View {
     }
 
     var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top) {
-                    Image(systemName: iconName)
-                        .font(.title2)
-                        .foregroundStyle(accentColor)
-                        .frame(width: 36, height: 36)
-                        .background(accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-
-                    Spacer()
-
-                    if let badge = mode.badge {
-                        Text(badge)
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(accentColor.opacity(0.15), in: Capsule())
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: action) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top) {
+                        Image(systemName: iconName)
+                            .font(.title2)
                             .foregroundStyle(accentColor)
+                            .frame(width: 36, height: 36)
+                            .background(accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+
+                        Spacer()
+
+                        if let badge = mode.badge {
+                            Text(badge)
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(accentColor.opacity(0.15), in: Capsule())
+                                .foregroundStyle(accentColor)
+                        }
                     }
+
+                    Text(mode.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Text(mode.summary)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
 
-                Text(mode.title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+            Spacer(minLength: 4)
 
-                Text(mode.summary)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+            if let edgeBinding = tiny11RemoveEdge {
+                HStack(spacing: 8) {
+                    Image(systemName: "globe")
+                        .font(.caption)
+                        .foregroundStyle(accentColor)
+                    Text(L10n.tiny11EdgeToggleLabel())
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    Spacer(minLength: 4)
+                    Toggle("", isOn: edgeBinding)
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        .labelsHidden()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            }
 
-                Spacer(minLength: 4)
-
+            Button(action: action) {
                 HStack {
-                    Text(isSelected ? "当前已选模式" : "点击选择并下一步")
+                    Text(isSelected ? L10n.modeCardSelected() : L10n.modeCardClickToSelect())
                         .font(.caption.weight(.medium))
                         .foregroundStyle(isSelected ? accentColor : .secondary)
                     Spacer()
-                    Image(systemName: "arrow.right.circle.fill")
+                    Image(systemName: "arrow.forward.circle.fill")
                         .foregroundStyle(isSelected ? accentColor : .secondary.opacity(0.5))
                 }
+                .contentShape(Rectangle())
             }
-            .padding(18)
-            .frame(maxWidth: .infinity, minHeight: 205, alignment: .topLeading)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isSelected ? accentColor : Color.primary.opacity(0.1), lineWidth: isSelected ? 2 : 1)
-            )
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(18)
+        .frame(maxWidth: .infinity, minHeight: 225, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(isSelected ? accentColor : Color.primary.opacity(0.1), lineWidth: isSelected ? 2 : 1)
+        )
     }
 }
 
@@ -137,9 +170,9 @@ struct SourceImportView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("导入本地 Windows 11 安装镜像")
+                Text(L10n.sourceViewTitle())
                     .font(.title2.bold())
-                Text("支持 Windows 11 22H2 / 23H2 / 24H2 / 25H2 及更新版本（ARM64 或 x64 官方 ISO）。源镜像仅以只读方式读取，绝不会被修改。")
+                Text(L10n.sourceViewSubtitle())
                     .foregroundStyle(.secondary)
             }
 
@@ -150,19 +183,19 @@ struct SourceImportView: View {
                     .foregroundStyle(isDropTargeted ? .blue : .accentColor)
 
                 if vm.isInspecting {
-                    ProgressView("正在只读挂载并解析 WIM/ESD 版本信息...")
+                    ProgressView(L10n.inspectingProgressText())
                         .controlSize(.regular)
                 } else {
-                    Text("将 Windows 11 .iso 文件拖放到此处")
+                    Text(L10n.dropZoneHeadline())
                         .font(.headline)
-                    Text("或者点击下方按钮选择本地 .iso 镜像 / 已解压安装目录")
+                    Text(L10n.dropZoneSubheadline())
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
                     Button {
                         vm.pickSourceISO()
                     } label: {
-                        Label("选择本地 ISO 文件...", systemImage: "folder.badge.plus")
+                        Label(L10n.pickLocalIsoButton(), systemImage: "folder.badge.plus")
                             .padding(.horizontal, 8)
                     }
                     .buttonStyle(.borderedProminent)
@@ -176,6 +209,7 @@ struct SourceImportView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .padding(.horizontal, 12)
+                        .environment(\.layoutDirection, .leftToRight)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -217,16 +251,19 @@ struct SourceImportView: View {
             }
 
             if let info = vm.inspection {
-                GroupBox("检测到的镜像详情与版本选择") {
+                GroupBox(L10n.detectedMediaBoxTitle()) {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             Label(
-                                "介质格式：\(info.installFileRelativePath) (\(ByteCountFormatter.string(fromByteCount: info.installFileBytes, countStyle: .file)))",
+                                L10n.mediaFormatLabel(
+                                    relativePath: info.installFileRelativePath,
+                                    formattedSize: L10n.formatBytes(info.installFileBytes)
+                                ),
                                 systemImage: "internaldrive"
                             )
                             Spacer()
                             Label(
-                                info.hasNetFx3Payload ? "包含 .NET 3.5 离线包" : "不含 sxs 载荷",
+                                info.hasNetFx3Payload ? L10n.netFx3IncludedLabel() : L10n.netFx3MissingLabel(),
                                 systemImage: info.hasNetFx3Payload ? "checkmark.circle.fill" : "minus.circle"
                             )
                             .foregroundStyle(info.hasNetFx3Payload ? .green : .secondary)
@@ -235,7 +272,7 @@ struct SourceImportView: View {
 
                         Divider()
 
-                        Picker("选择要提取并精简的 Windows 版本 (SKU)：", selection: $vm.recipe.imageIndex) {
+                        Picker(L10n.skuPickerLabel(), selection: $vm.recipe.imageIndex) {
                             ForEach(info.images) { img in
                                 Text("\(img.index). \(img.name) (\(img.architecture.rawValue.uppercased()) · Build \(img.build).\(img.servicePackBuild))")
                                     .tag(img.index)
@@ -252,7 +289,7 @@ struct SourceImportView: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(selected.summary)
                                         .font(.subheadline.weight(.semibold))
-                                    Text("逻辑展开大小：\(ByteCountFormatter.string(fromByteCount: selected.totalBytes, countStyle: .file)) · 将仅导出此单一版本，自动剔除其他冗余 SKU。")
+                                    Text(L10n.logicalSizeCaption(L10n.formatBytes(selected.totalBytes)))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -264,7 +301,7 @@ struct SourceImportView: View {
                                 HStack(spacing: 8) {
                                     Image(systemName: "info.circle.fill")
                                         .foregroundStyle(.blue)
-                                    Text("提示：当前导入的是 x64 镜像。若用于 Apple Silicon 上的 Parallels Desktop 或 VMware Fusion 高速虚拟化，建议使用 ARM64 版 Windows 11 ISO；x64 镜像适用于 PC 真机装机或 UTM 跨架构模拟。")
+                                    Text(L10n.x64OnMacVmTip())
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }

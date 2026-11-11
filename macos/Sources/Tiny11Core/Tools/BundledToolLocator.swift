@@ -19,7 +19,7 @@ public enum BundledToolLocator {
         let fm = FileManager.default
         let hdiutil = "/usr/bin/hdiutil"
         guard fm.isExecutableFile(atPath: hdiutil) else {
-            throw Tiny11Error.toolMissing("/usr/bin/hdiutil 不可用。")
+            throw Tiny11Error.toolMissing(L10n.hdiutilUnavailable())
         }
 
         // 1. 优先查找 .app/Contents/Resources/bin 内嵌的独立工具
@@ -52,14 +52,10 @@ public enum BundledToolLocator {
         ].compactMap { $0 }
 
         guard let wimPath = wimCandidates.first(where: { fm.isExecutableFile(atPath: $0) }) else {
-            throw Tiny11Error.toolMissing(
-                "未找到 wimlib-imagex。若是开发模式请运行 macos/Scripts/setup-dev-deps.sh，或使用打包好的 Tiny11Builder.app。"
-            )
+            throw Tiny11Error.toolMissing(L10n.wimlibMissing())
         }
         guard let mkisofsPath = isoCandidates.first(where: { fm.isExecutableFile(atPath: $0) }) else {
-            throw Tiny11Error.toolMissing(
-                "未找到 mkisofs (cdrtools)。若是开发模式请运行 macos/Scripts/setup-dev-deps.sh，或使用打包好的 Tiny11Builder.app。"
-            )
+            throw Tiny11Error.toolMissing(L10n.mkisofsMissing())
         }
 
         return ToolLocations(

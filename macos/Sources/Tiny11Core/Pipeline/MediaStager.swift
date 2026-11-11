@@ -26,7 +26,7 @@ public enum MediaStager {
             includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey],
             options: []
         ) else {
-            throw Tiny11Error.invalidMedia("无法遍历安装介质目录：\(sourceRoot)")
+            throw Tiny11Error.invalidMedia(L10n.stagerEnumerateError(sourceRoot))
         }
 
         struct PendingCopy {
@@ -43,7 +43,7 @@ public enum MediaStager {
             try Task.checkCancellation()
             let values = try itemURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey])
             if values.isSymbolicLink == true {
-                throw Tiny11Error.invalidMedia("安装介质包含不受支持的符号链接：\(itemURL.path)")
+                throw Tiny11Error.invalidMedia(L10n.stagerUnsupportedSymlink(itemURL.path))
             }
             if values.isDirectory == true {
                 continue
@@ -64,7 +64,7 @@ public enum MediaStager {
                 continue
             }
             if lowerRel.hasPrefix("sources/install") && lowerRel.hasSuffix(".swm") {
-                throw Tiny11Error.invalidMedia("不支持分卷拆分的 install.swm 源介质，请使用完整官方 ISO。")
+                throw Tiny11Error.invalidMedia(L10n.stagerUnsupportedSwm())
             }
             if omitNetFx3Payload && lowerRel.hasPrefix("sources/sxs/") {
                 omittedCount += 1
@@ -95,19 +95,19 @@ public enum MediaStager {
             let rc = Darwin.copyfile(entry.source.path, destURL.path, nil, copyfile_flags_t(COPYFILE_DATA))
             guard rc == 0 else {
                 let errMsg = String(cString: strerror(errno))
-                throw Tiny11Error.invalidMedia("复制安装介质文件 \(entry.relativePath) 失败：\(errMsg)")
+                throw Tiny11Error.invalidMedia(L10n.stagerCopyFailed(relativePath: entry.relativePath, error: errMsg))
             }
             _ = Darwin.chmod(destURL.path, mode_t(0o644))
             copiedBytes += entry.size
 
             let current = idx + 1
             if current % 100 == 0 || current == candidates.count {
-                onLog("已暂存安装介质文件 \(current) / \(candidates.count)")
+                onLog(L10n.logMediaStagedProgress(current: current, total: candidates.count))
             }
         }
 
         if omittedCount > 0 {
-            onLog("已按设置省略 sources/sxs (.NET 3.5 安装载荷)：共 \(omittedCount) 个文件，节省 \(omittedBytes / (1024 * 1024)) MiB")
+            onLog(L10n.logOmittedNetFx3Payload(count: omittedCount, mib: omittedBytes / (1024 * 1024)))
         }
 
         return MediaStagingResult(

@@ -59,9 +59,7 @@ public enum ImagePruner {
         let hasPending = hasPendingXml || hasRegistryPending
 
         if hasPending && recipe.effectiveCore {
-            throw Tiny11Error.validationFailed(
-                "检测到该镜像包含尚未完成的挂起更新 (pending.xml 或 CBS 挂起状态)。Tiny11 Core 会删除首次开机完成更新所需的组件，已中止裁剪；请改用 Mac 虚拟机优化版或标准版构建。"
-            )
+            throw Tiny11Error.validationFailed(L10n.corePendingUpdateError())
         }
 
         // 1. 扫描预装 AppX 目录 (/Program Files/WindowsApps/* 与 /Windows/InfusedApps/Packages/*)
@@ -77,7 +75,7 @@ public enum ImagePruner {
                 if CleanupCatalog.matchesAppPackageName(folderName, selectedOptionIds: selectedSet) != nil {
                     discoveredPackages.append(folderName)
                     scheduleDelete(p)
-                    log("计划移除预装应用载荷: \(p)")
+                    log(L10n.logScheduledAppDelete(p))
                 }
             }
         }
@@ -87,7 +85,7 @@ public enum ImagePruner {
             for candidate in ["/windows/system32/onedrivesetup.exe", "/windows/syswow64/onedrivesetup.exe"] {
                 if let exact = lowerLookup[candidate] {
                     scheduleDelete(exact)
-                    log("计划移除 OneDrive 安装器: \(exact)")
+                    log(L10n.logScheduledOneDriveDelete(exact))
                 }
             }
         }
@@ -96,16 +94,16 @@ public enum ImagePruner {
         var edgeRemoved = false
         if selectedSet.contains("edge-files") {
             if hasPending {
-                let warn = "镜像存在挂起的组件服务操作，为避免首次开机失败，已保留 Edge/WebView2 文件。"
+                let warn = L10n.edgeRetainedPendingWarning()
                 warnings.append(warn)
-                log("警告: \(warn)")
+                log(L10n.logWarning(warn))
             } else {
                 for base in ["/program files/microsoft/", "/program files (x86)/microsoft/"] {
                     for edgeDir in ["edge", "edgecore", "edgeupdate", "edgewebview"] {
                         if let exact = lowerLookup[base + edgeDir] {
                             scheduleDelete(exact)
                             edgeRemoved = true
-                            log("计划移除 Edge 目录: \(exact)")
+                            log(L10n.logScheduledEdgeDelete(exact))
                         }
                     }
                 }
@@ -175,7 +173,7 @@ public enum ImagePruner {
                 }
                 if !found {
                     throw Tiny11Error.unsupportedImage(
-                        "Core 模式无法在该构建版本中识别必需的 \(image.architecture.rawValue) \(requiredFamily) 运行库布局，已安全停止裁剪。"
+                        L10n.coreMissingRuntimeLayoutError(arch: image.architecture.rawValue, family: requiredFamily)
                     )
                 }
             }
@@ -185,11 +183,11 @@ public enum ImagePruner {
                 scheduleDelete(item.exactPath)
                 prunedWinSxsCount += 1
             }
-            log("Core: 计划裁剪 WinSxS 非核心组件目录 \(prunedWinSxsCount) 个")
+            log(L10n.logCorePrunedWinSxS(prunedWinSxsCount))
 
             if let winre = lowerLookup["/windows/system32/recovery/winre.wim"] {
                 scheduleDelete(winre)
-                log("Core: 计划移除恢复镜像 \(winre)")
+                log(L10n.logCoreScheduledWinREDelete(winre))
             }
         }
 

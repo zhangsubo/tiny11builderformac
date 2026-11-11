@@ -20,7 +20,7 @@ public enum BootImageEditor {
             ?? bootImages.first(where: { $0.index == 2 })
             ?? bootImages.first
         guard let targetSetup = setupImage else {
-            throw Tiny11Error.invalidMedia("无法在 boot.wim 中找到有效的 Windows Setup 引导卷。")
+            throw Tiny11Error.invalidMedia(L10n.bootWimSetupNotFound())
         }
 
         let fm = FileManager.default
@@ -38,7 +38,7 @@ public enum BootImageEditor {
 
         if bypassHardware {
             guard let sysWimPath = lowerMap["/windows/system32/config/system"] else {
-                throw Tiny11Error.invalidMedia("boot.wim 缺少 SYSTEM 注册表文件。")
+                throw Tiny11Error.invalidMedia(L10n.bootWimMissingSystemHive())
             }
             let hiveDir = bootScratch.appendingPathComponent("hive", isDirectory: true)
             try await wimClient.extract(
@@ -60,18 +60,18 @@ public enum BootImageEditor {
             } else if lowerMap["/sources/setup.exe"] != nil {
                 legacyExeRel = #"sources\setup.exe"#
             } else {
-                throw Tiny11Error.invalidMedia("Core 模式需要经典安装器 sources\\setup.exe，但当前镜像的 boot.wim 中未包含该文件。")
+                throw Tiny11Error.invalidMedia(L10n.bootWimMissingLegacySetup())
             }
 
             let winpeshlContent = "[LaunchApps]\r\n%SYSTEMROOT%\\System32\\wpeinit.exe\r\n%SYSTEMDRIVE%\\\(legacyExeRel)\r\n"
             let localWinpeshl = bootScratch.appendingPathComponent("winpeshl.ini")
             guard let asciiData = winpeshlContent.data(using: .ascii) else {
-                throw Tiny11Error.validationFailed("无法编码 winpeshl.ini。")
+                throw Tiny11Error.validationFailed(L10n.winpeshlEncodeFailed())
             }
             try asciiData.write(to: localWinpeshl)
             let targetWinpeshl = lowerMap["/windows/system32/winpeshl.ini"] ?? "/Windows/System32/winpeshl.ini"
             commands.append(.add(localPath: localWinpeshl.path, wimPath: targetWinpeshl))
-            log("Core: 已在 boot.wim 启用经典安装器 (%SYSTEMDRIVE%\\\(legacyExeRel))")
+            log(L10n.logCoreLegacySetupEnabled(legacyExeRel))
         }
 
         try await wimClient.update(

@@ -27,19 +27,19 @@ public final class MacBuildEngine: Sendable {
             _ = fm.fileExists(atPath: sourcePath, isDirectory: &isDir)
 
             guard let bootWim = IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["sources", "boot.wim"]) else {
-                throw Tiny11Error.invalidMedia("源介质不是完整的 Windows 安装镜像：缺少 sources/boot.wim。")
+                throw Tiny11Error.invalidMedia(L10n.mediaMissingBootWim())
             }
 
             let installMedia = IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["sources", "install.wim"])
                 ?? IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["sources", "install.esd"])
             guard let install = installMedia else {
-                throw Tiny11Error.invalidMedia("未找到 sources/install.wim 或 install.esd（不支持拆分版 install.swm）。")
+                throw Tiny11Error.invalidMedia(L10n.mediaMissingInstallWim())
             }
 
             let efiBoot = IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["efi", "microsoft", "boot", "efisys.bin"])
                 ?? IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["efi", "microsoft", "boot", "efisys_noprompt.bin"])
             guard let efi = efiBoot else {
-                throw Tiny11Error.invalidMedia("源介质缺少 UEFI 引导扇区文件 (efi/microsoft/boot/efisys.bin)。")
+                throw Tiny11Error.invalidMedia(L10n.mediaMissingEfiBoot())
             }
 
             let biosBoot = IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["boot", "etfsboot.com"])
@@ -71,10 +71,11 @@ public final class MacBuildEngine: Sendable {
     }
 
     public static func selectRecommendedIndex(from images: [WindowsImage]) -> Int {
-        if let pro = images.first(where: {
-            $0.editionId.caseInsensitiveCompare("Professional") == .orderedSame ||
-            $0.name.caseInsensitiveCompare("Windows 11 Pro") == .orderedSame ||
-            $0.name.contains("专业版")
+        // WIM XML <EDITIONID> is language-neutral ("Professional"); also match localized Pro display names
+        let proKeywords = ["Windows 11 Pro", "专业版", "Professionnel", "Профессиональная"]
+        if let pro = images.first(where: { img in
+            img.editionId.caseInsensitiveCompare("Professional") == .orderedSame ||
+            proKeywords.contains(where: { img.name.localizedCaseInsensitiveContains($0) })
         }) {
             return pro.index
         }
@@ -103,8 +104,8 @@ public final class MacBuildEngine: Sendable {
 
         let logFileURL = jobDir.appendingPathComponent("build.log")
         let logger = JobFileLogger(fileURL: logFileURL, forward: onLog)
-        logger.log("Tiny11 Builder for Mac · 任务启动: \(jobDir.path)")
-        logger.log("工具链模式: \(tools.bundledMode ? "App 内嵌独立工具" : "开发环境工具") | wimlib=\(tools.wimlibImagex) | mkisofs=\(tools.mkisofs)")
+        logger.log(L10n.logJobStarted(jobDir.path))
+        logger.log(L10n.logToolchainMode(bundled: tools.bundledMode, wimlib: tools.wimlibImagex, mkisofs: tools.mkisofs))
 
         // 保存输入配方快照
         let encoder = JSONEncoder()
@@ -153,7 +154,7 @@ public final class MacBuildEngine: Sendable {
         var openedMedia: OpenedMedia?
         do {
             // 1. 挂载并检查源介质与可用磁盘空间
-            try beginPhase(.prepareMedia, detail: "正在挂载源镜像并检查系统版本与磁盘剩余空间...")
+            try beginPhase(.prepareMedia, detail: L10n.phasePrepareRunning())
             let opened = try await mediaReader.open(sourcePath: recipe.sourcePath)
             openedMedia = opened
 
@@ -165,19 +166,19 @@ public final class MacBuildEngine: Sendable {
                     ?? IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["sources", "install.esd"]),
                   let efiRel = IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["efi", "microsoft", "boot", "efisys.bin"])
                     ?? IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["efi", "microsoft", "boot", "efisys_noprompt.bin"]) else {
-                throw Tiny11Error.invalidMedia("源介质缺少必需的引导或安装镜像文件 (boot.wim / install.wim / efisys.bin)。")
+                throw Tiny11Error.invalidMedia(L10n.mediaMissingRequiredFiles())
             }
             let biosRel = IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["boot", "etfsboot.com"])
 
             let images = try await wimClient.getImages(wimFile: installRel.fullPath)
             guard let targetImage = images.first(where: { $0.index == recipe.imageIndex }) else {
-                throw Tiny11Error.validationFailed("源镜像中不存在索引为 \(recipe.imageIndex) 的系统版本。")
+                throw Tiny11Error.validationFailed(L10n.imageIndexNotFound(recipe.imageIndex))
             }
             try targetImage.validate()
-            logger.log("目标版本: \(targetImage.summary)")
+            logger.log(L10n.logTargetEdition(targetImage.summary))
 
             if recipe.enableNetFx3 && IsoMediaReader.resolveCaseInsensitive(root: opened.rootPath, components: ["sources", "sxs"]) == nil {
-                throw Tiny11Error.invalidMedia("已勾选启用 .NET Framework 3.5，但当前源镜像不包含 sources/sxs 离线安装包。")
+                throw Tiny11Error.invalidMedia(L10n.netFx3PayloadMissingError())
             }
 
             try checkAvailableDiskSpace(at: workspaceRoot, requiredBytes: max(18 * 1024 * 1024 * 1024, targetImage.totalBytes + 8 * 1024 * 1024 * 1024))
@@ -189,10 +190,10 @@ public final class MacBuildEngine: Sendable {
                 omitNetFx3Payload: recipe.omitNetFx3Payload && !recipe.enableNetFx3,
                 onLog: { logger.log($0) }
             )
-            finishPhase(.prepareMedia, detail: "已复制 \(stagingResult.copiedFiles) 个安装支持文件")
+            finishPhase(.prepareMedia, detail: L10n.phasePrepareDone(copiedFiles: stagingResult.copiedFiles))
 
             // 2. 导出单版本工作 WIM
-            try beginPhase(.exportEdition, detail: "正在导出 \(targetImage.name) 至可读写工作镜像...")
+            try beginPhase(.exportEdition, detail: L10n.phaseExportRunning(imageName: targetImage.name))
             let workingWim = jobDir.appendingPathComponent("working.wim").path
             try await wimClient.export(
                 sourceWim: installRel.fullPath,
@@ -206,7 +207,7 @@ public final class MacBuildEngine: Sendable {
                         onProgress(BuildProgressEvent(
                             phase: .exportEdition,
                             operationId: "stage:\(BuildPhaseId.exportEdition.rawValue)",
-                            message: "正在导出单版本工作镜像 (\(Int(pct))%)",
+                            message: L10n.phaseExportPercent(Int(pct)),
                             state: .running,
                             percent: pct
                         ))
@@ -216,10 +217,10 @@ public final class MacBuildEngine: Sendable {
             // 源镜像文件提取完毕后即可提前卸载只读光盘挂载点
             await mediaReader.close(opened)
             openedMedia = nil
-            finishPhase(.exportEdition, detail: "单版本导出完成 (索引已归一为 1)")
+            finishPhase(.exportEdition, detail: L10n.phaseExportDone())
 
             // 3. 提取并离线修改注册表 Hive
-            try beginPhase(.modifyRegistry, detail: "正在扫描镜像结构并注入离线注册表策略与防重装锁...")
+            try beginPhase(.modifyRegistry, detail: L10n.phaseRegistryRunning())
             let allWimPaths = try await wimClient.listPaths(wimFile: workingWim, index: 1)
             var lowerPathMap: [String: String] = [:]
             for p in allWimPaths { lowerPathMap[p.lowercased()] = p }
@@ -227,7 +228,7 @@ public final class MacBuildEngine: Sendable {
             guard let wimSoftwarePath = lowerPathMap["/windows/system32/config/software"],
                   let wimSystemPath = lowerPathMap["/windows/system32/config/system"],
                   let wimDefaultUserPath = lowerPathMap["/users/default/ntuser.dat"] else {
-                throw Tiny11Error.invalidMedia("工作镜像缺少核心注册表 Hive 文件 (SOFTWARE / SYSTEM / NTUSER.DAT)。")
+                throw Tiny11Error.invalidMedia(L10n.missingCoreHivesError())
             }
 
             let hiveDir = jobDir.appendingPathComponent("hives", isDirectory: true)
@@ -263,11 +264,14 @@ public final class MacBuildEngine: Sendable {
             )
             finishPhase(
                 .modifyRegistry,
-                detail: "写入策略 \(hiveSummary.policiesWritten) 项 · 锁定预装应用 \(hiveSummary.deprovisionedFamilies.count) 个"
+                detail: L10n.phaseRegistryDone(
+                    policies: hiveSummary.policiesWritten,
+                    lockedApps: hiveSummary.deprovisionedFamilies.count
+                )
             )
 
             // 4. 在 WIM 归档内执行原子裁剪与 Hive 回写
-            try beginPhase(.pruneImage, detail: "正在执行流式组件裁剪与注册表提交 (共 \(prunePlan.deleteWimPaths.count) 项移除)...")
+            try beginPhase(.pruneImage, detail: L10n.phasePruneRunning(count: prunePlan.deleteWimPaths.count))
             var updateCommands: [WimUpdateCommand] = prunePlan.deleteWimPaths.map { .delete(wimPath: $0) }
             updateCommands.append(.add(localPath: localSoftware, wimPath: wimSoftwarePath))
             updateCommands.append(.add(localPath: localSystem, wimPath: wimSystemPath))
@@ -281,7 +285,7 @@ public final class MacBuildEngine: Sendable {
                     localPath: localScript.path,
                     wimPath: "/Windows/Setup/Scripts/Tiny11Specialize.ps1"
                 ))
-                logger.log("已注入部署期可选功能与预装存根清理脚本: /Windows/Setup/Scripts/Tiny11Specialize.ps1")
+                logger.log(L10n.logSpecializeScriptInjected())
             }
 
             try await wimClient.update(
@@ -291,10 +295,10 @@ public final class MacBuildEngine: Sendable {
                 checkIntegrity: true,
                 onOutput: { logger.log($0) }
             )
-            finishPhase(.pruneImage, detail: "已移除 \(prunePlan.deleteWimPaths.count) 个目录/文件并提交离线注册表")
+            finishPhase(.pruneImage, detail: L10n.phasePruneDone(count: prunePlan.deleteWimPaths.count))
 
             // 5. 生成 autounattend.xml 并修改引导镜像 boot.wim
-            try beginPhase(.configureBoot, detail: "正在生成无人值守应答配置并处理引导镜像 boot.wim...")
+            try beginPhase(.configureBoot, detail: L10n.phaseBootRunning())
             let unattendXml = UnattendGenerator.generateXML(
                 image: targetImage,
                 recipe: recipe,
@@ -302,7 +306,7 @@ public final class MacBuildEngine: Sendable {
             )
             let stagedUnattendURL = stagingDir.appendingPathComponent("autounattend.xml")
             try Data(unattendXml.utf8).write(to: stagedUnattendURL)
-            logger.log("已写入应答配置文件: autounattend.xml (架构: \(targetImage.architecture.unattendProcessorArchitecture))")
+            logger.log(L10n.logUnattendWritten(targetImage.architecture.unattendProcessorArchitecture))
 
             let stagedBootWim = stagingDir.appendingPathComponent(bootWimRel.relativePath).path
             let legacyInstallerUsed = try await BootImageEditor.customizeBootWimIfNeeded(
@@ -312,14 +316,11 @@ public final class MacBuildEngine: Sendable {
                 wimClient: wimClient,
                 log: { logger.log($0) }
             )
-            finishPhase(
-                .configureBoot,
-                detail: legacyInstallerUsed ? "已配置应答文件、硬件绕过与经典安装器" : "已配置应答文件与引导环境"
-            )
+            finishPhase(.configureBoot, detail: L10n.phaseBootDone(legacyInstallerUsed: legacyInstallerUsed))
 
             // 6. 最终多核压缩导出至 staging/sources/install.(esd|wim)
             let destInstallLeaf = recipe.compression.installFileName
-            try beginPhase(.compressImage, detail: "正在使用 Apple Silicon 多核压缩生成 \(destInstallLeaf) (\(recipe.compression.title))...")
+            try beginPhase(.compressImage, detail: L10n.phaseCompressRunning(leaf: destInstallLeaf, modeTitle: recipe.compression.title))
             let stagedSourcesDir = stagingDir.appendingPathComponent((bootWimRel.relativePath as NSString).deletingLastPathComponent)
             let finalInstallPath = stagedSourcesDir.appendingPathComponent(destInstallLeaf).path
             try await wimClient.export(
@@ -334,7 +335,7 @@ public final class MacBuildEngine: Sendable {
                         onProgress(BuildProgressEvent(
                             phase: .compressImage,
                             operationId: "stage:\(BuildPhaseId.compressImage.rawValue)",
-                            message: "正在多核压缩 \(destInstallLeaf) (\(Int(pct))%)",
+                            message: L10n.phaseCompressPercent(leaf: destInstallLeaf, pct: Int(pct)),
                             state: .running,
                             percent: pct
                         ))
@@ -344,10 +345,10 @@ public final class MacBuildEngine: Sendable {
             if !recipe.keepWorkingFiles {
                 try? fm.removeItem(atPath: workingWim)
             }
-            finishPhase(.compressImage, detail: "已完成 \(destInstallLeaf) 压缩校验")
+            finishPhase(.compressImage, detail: L10n.phaseCompressDone(leaf: destInstallLeaf))
 
             // 7. 封装可引导 UDF/UEFI ISO
-            try beginPhase(.createISO, detail: "正在使用 mkisofs 构建 UEFI/UDF 可引导光盘镜像...")
+            try beginPhase(.createISO, detail: L10n.phaseIsoRunning())
             let tempIsoPath = jobDir.appendingPathComponent("output.iso").path
             let volLabel = recipe.effectiveCore ? "TINY11_CORE" : "TINY11_\(targetImage.architecture.rawValue.uppercased())"
             try await isoCreator.createBootableISO(
@@ -359,16 +360,16 @@ public final class MacBuildEngine: Sendable {
                 volumeLabel: volLabel,
                 onOutput: { logger.log($0) }
             )
-            finishPhase(.createISO, detail: "可引导光盘镜像合成完毕")
+            finishPhase(.createISO, detail: L10n.phaseIsoDone())
 
             // 8. 校验 ISO 结构、计算 SHA-256 并原子发布
-            try beginPhase(.verifyOutput, detail: "正在校验 ISO 卷结构并计算 SHA-256 校验和...")
+            try beginPhase(.verifyOutput, detail: L10n.phaseVerifyRunning())
             try IsoValidator.validateISO(at: tempIsoPath)
             let (isoBytes, sha256) = try IsoValidator.sha256Hex(at: tempIsoPath) { pct in
                 onProgress(BuildProgressEvent(
                     phase: .verifyOutput,
                     operationId: "stage:\(BuildPhaseId.verifyOutput.rawValue)",
-                    message: "正在计算输出镜像 SHA-256 (\(pct)%)",
+                    message: L10n.phaseVerifyPercent(pct),
                     state: .running,
                     percent: Double(pct)
                 ))
@@ -377,7 +378,7 @@ public final class MacBuildEngine: Sendable {
             let outputURL = URL(fileURLWithPath: recipe.outputPath).standardizedFileURL
             try fm.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             if fm.fileExists(atPath: outputURL.path) {
-                throw Tiny11Error.validationFailed("目标路径在构建期间出现了同名文件，已保留镜像副本于：\(tempIsoPath)")
+                throw Tiny11Error.validationFailed(L10n.outputAppearedDuringBuildError(tempIsoPath))
             }
             try fm.moveItem(at: URL(fileURLWithPath: tempIsoPath), to: outputURL)
 
@@ -403,22 +404,22 @@ public final class MacBuildEngine: Sendable {
                 }
             }
 
-            logger.log("构建成功! 输出镜像: \(outputURL.path)")
-            logger.log("大小: \(ByteCountFormatter.string(fromByteCount: isoBytes, countStyle: .file)) | SHA-256: \(sha256)")
+            logger.log(L10n.logBuildSuccess(outputURL.path))
+            logger.log(L10n.logBuildSizeAndSha(size: L10n.formatBytes(isoBytes), sha256: sha256))
             logger.flush()
-            finishPhase(.verifyOutput, detail: "校验通过并已发布 ISO")
+            finishPhase(.verifyOutput, detail: L10n.phaseVerifyDone())
             return result
         } catch {
             if let opened = openedMedia {
                 await mediaReader.close(opened)
             }
             let isCancelled = error is CancellationError || (error as? Tiny11Error)?.isCancelledError == true
-            logger.log(isCancelled ? "构建已由用户取消。" : "构建失败: \(error.localizedDescription)")
+            logger.log(isCancelled ? L10n.logBuildCancelled() : L10n.logBuildFailed(error.localizedDescription))
             logger.flush()
             onProgress(BuildProgressEvent(
                 phase: currentPhase,
                 operationId: "stage:\(currentPhase.rawValue)",
-                message: isCancelled ? "已取消" : error.localizedDescription,
+                message: isCancelled ? L10n.phaseCancelledShort() : error.localizedDescription,
                 state: isCancelled ? .cancelled : .failed,
                 detail: error.localizedDescription
             ))
@@ -436,12 +437,12 @@ public final class MacBuildEngine: Sendable {
         if free > 0 && free < requiredBytes {
             let needGiB = (requiredBytes + (1 << 30) - 1) >> 30
             let freeGiB = free >> 30
-            throw Tiny11Error.validationFailed("工作目录所在磁盘剩余空间不足（当前可用约 \(freeGiB) GiB，建议至少预留 \(needGiB) GiB）。")
+            throw Tiny11Error.validationFailed(L10n.insufficientDiskSpaceError(freeGiB: freeGiB, needGiB: needGiB))
         }
     }
 }
 
-private extension Tiny11Error {
+public extension Tiny11Error {
     var isCancelledError: Bool {
         if case .cancelled = self { return true }
         return false

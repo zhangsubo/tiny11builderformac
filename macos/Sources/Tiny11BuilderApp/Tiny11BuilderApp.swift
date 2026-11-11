@@ -11,7 +11,7 @@ struct MainWizardView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Tiny11 Builder")
                         .font(.headline)
-                    Text("for Mac Apple Silicon")
+                    Text(L10n.sidebarSubtitle())
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -57,7 +57,7 @@ struct MainWizardView: View {
                     Button {
                         vm.importRecipe()
                     } label: {
-                        Label("导入配方 (.json)", systemImage: "square.and.arrow.down")
+                        Label(L10n.importRecipeButton(), systemImage: "square.and.arrow.down")
                             .font(.caption)
                     }
                     .buttonStyle(.plain)
@@ -66,7 +66,7 @@ struct MainWizardView: View {
                     Button {
                         vm.exportRecipe()
                     } label: {
-                        Label("导出当前配方", systemImage: "square.and.arrow.up")
+                        Label(L10n.exportRecipeButton(), systemImage: "square.and.arrow.up")
                             .font(.caption)
                     }
                     .buttonStyle(.plain)
@@ -75,7 +75,7 @@ struct MainWizardView: View {
                 .padding(.vertical, 8)
             }
             .padding(10)
-            .navigationSplitViewColumnWidth(min: 200, ideal: 215, max: 240)
+            .navigationSplitViewColumnWidth(min: 210, ideal: 235, max: 270)
         } detail: {
             VStack(spacing: 0) {
                 if let banner = vm.bannerMessage {
@@ -85,7 +85,7 @@ struct MainWizardView: View {
                         Text(banner)
                             .font(.callout)
                         Spacer()
-                        Button("关闭") { vm.bannerMessage = nil }
+                        Button(L10n.closeBannerButton()) { vm.bannerMessage = nil }
                             .buttonStyle(.borderless)
                             .font(.caption)
                     }
@@ -110,7 +110,7 @@ struct MainWizardView: View {
                         Button {
                             vm.goBack()
                         } label: {
-                            Label("上一步", systemImage: "chevron.left")
+                            Label(L10n.backButton(), systemImage: "chevron.backward")
                         }
                         .keyboardShortcut("[", modifiers: [.command])
                     }
@@ -121,7 +121,7 @@ struct MainWizardView: View {
                         Button {
                             vm.startBuild()
                         } label: {
-                            Label("开始制作精简版 ISO", systemImage: "play.fill")
+                            Label(L10n.startBuildButton(), systemImage: "play.fill")
                                 .padding(.horizontal, 10)
                         }
                         .buttonStyle(.borderedProminent)
@@ -132,8 +132,8 @@ struct MainWizardView: View {
                             vm.advanceStep()
                         } label: {
                             HStack(spacing: 4) {
-                                Text("下一步")
-                                Image(systemName: "chevron.right")
+                                Text(L10n.nextButton())
+                                Image(systemName: "chevron.forward")
                             }
                             .padding(.horizontal, 8)
                         }
@@ -141,7 +141,7 @@ struct MainWizardView: View {
                         .controlSize(.large)
                         .disabled(!vm.canGoNext)
                     } else if !vm.isBuilding && vm.buildResult != nil {
-                        Button("新建另一个构建") {
+                        Button(L10n.newAnotherBuildButton()) {
                             vm.updateDefaultOutputPath()
                             vm.advanceStep(to: .mode)
                         }
@@ -159,29 +159,29 @@ struct MainWizardView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.largeTitle)
                         .foregroundStyle(.orange)
-                    Text("确认启用 Tiny11 Core 极限裁剪？")
+                    Text(L10n.coreSheetTitle())
                         .font(.title3.bold())
                 }
 
-                Text("Tiny11 Core 会物理删除 WinSxS 组件库中的非核心文件、移除 WinRE 恢复环境，并禁用 Windows Update 与 Microsoft Defender。")
+                Text(L10n.coreSheetDescription())
                     .font(.body)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("• 安装后系统无法打任何安全补丁、累计更新或开启新系统功能；")
-                    Text("• 若你的目标是在 Parallels Desktop / VMware Fusion / UTM 中作为日常办公主力机，强烈建议改选「Mac 虚拟机优化版」；")
-                    Text("• Core 仅适合一次性软件测试或极限低配沙盒虚拟机。")
+                    Text(L10n.coreSheetBullet1())
+                    Text(L10n.coreSheetBullet2())
+                    Text(L10n.coreSheetBullet3())
                 }
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
                 HStack {
                     Spacer()
-                    Button("返回安全模式") {
+                    Button(L10n.coreSheetCancelButton()) {
                         vm.cancelCoreRisk()
                     }
                     .keyboardShortcut(.cancelAction)
 
-                    Button("我已知悉风险，继续启用 Core") {
+                    Button(L10n.coreSheetConfirmButton()) {
                         vm.confirmCoreRisk()
                     }
                     .buttonStyle(.borderedProminent)
@@ -190,8 +190,12 @@ struct MainWizardView: View {
                 .padding(.top, 8)
             }
             .padding(24)
-            .frame(width: 480)
+            .frame(width: 520)
+            .environment(\.locale, vm.language.locale)
+            .environment(\.layoutDirection, vm.language.isRTL ? .rightToLeft : .leftToRight)
         }
+        .environment(\.locale, vm.language.locale)
+        .environment(\.layoutDirection, vm.language.isRTL ? .rightToLeft : .leftToRight)
     }
 
     @ViewBuilder
@@ -227,9 +231,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "正在构建 Windows 11 镜像"
-        alert.informativeText = "当前仍有镜像处理任务正在运行。请先点击「安全取消」等待临时挂载点清理完成后再退出应用。"
-        alert.addButton(withTitle: "继续构建")
+        alert.messageText = L10n.quitAlertTitle()
+        alert.informativeText = L10n.quitAlertMessage()
+        alert.addButton(withTitle: L10n.quitAlertContinueButton())
         alert.runModal()
         return .terminateCancel
     }
@@ -245,14 +249,14 @@ struct Tiny11BuilderMacApp: App {
     @State private var viewModel = BuilderViewModel()
 
     var body: some Scene {
-        WindowGroup("Tiny11 Builder for Mac") {
+        WindowGroup(L10n.windowTitle()) {
             MainWizardView(vm: viewModel)
-                .frame(minWidth: 960, minHeight: 660)
+                .frame(minWidth: 980, minHeight: 660)
                 .onAppear {
                     appDelegate.viewModel = viewModel
                 }
         }
-        .defaultSize(width: 1100, height: 760)
+        .defaultSize(width: 1120, height: 760)
         .commands {
             CommandGroup(replacing: .newItem) {}
         }

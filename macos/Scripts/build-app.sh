@@ -90,7 +90,16 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key>
-    <string>zh_CN</string>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>zh-Hans</string>
+        <string>fr</string>
+        <string>es</string>
+        <string>ru</string>
+        <string>ar</string>
+    </array>
     <key>CFBundleDisplayName</key>
     <string>Tiny11 Builder</string>
     <key>CFBundleExecutable</key>
@@ -118,6 +127,14 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
 </dict>
 </plist>
 EOF
+
+for lang in en zh-Hans fr es ru ar; do
+    mkdir -p "$APP_BUNDLE/Contents/Resources/${lang}.lproj"
+    cat > "$APP_BUNDLE/Contents/Resources/${lang}.lproj/InfoPlist.strings" <<'STRINGS_EOF'
+"CFBundleDisplayName" = "Tiny11 Builder";
+"CFBundleName" = "Tiny11 Builder";
+STRINGS_EOF
+done
 
 echo "==> [4/6] Bundling native tools and relocating dynamic libraries..."
 WIMLIB_PREFIX="$(brew --prefix wimlib)"

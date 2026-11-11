@@ -23,7 +23,9 @@ public final class HiveSession {
         guard let h = hivex_open(path, flags) else {
             let code = errno
             let msg = String(cString: strerror(code))
-            throw Tiny11Error.registryError("无法打开离线注册表文件 \(URL(fileURLWithPath: path).lastPathComponent): \(msg) (errno=\(code))")
+            throw Tiny11Error.registryError(
+                L10n.hiveOpenFailed(fileName: URL(fileURLWithPath: path).lastPathComponent, message: msg, code: code)
+            )
         }
         self.handle = h
     }
@@ -43,7 +45,7 @@ public final class HiveSession {
 
     private func requireHandle() throws -> OpaquePointer {
         guard let h = handle else {
-            throw Tiny11Error.registryError("注册表会话已关闭。")
+            throw Tiny11Error.registryError(L10n.hiveSessionClosed())
         }
         return h
     }
@@ -52,7 +54,7 @@ public final class HiveSession {
         let h = try requireHandle()
         let root = hivex_root(h)
         guard root != 0 else {
-            throw Tiny11Error.registryError("无法定位注册表根节点：\(path)")
+            throw Tiny11Error.registryError(L10n.hiveRootNotFound(path))
         }
         return root
     }
@@ -70,7 +72,7 @@ public final class HiveSession {
             if next == 0 {
                 if errno != 0 && errno != ENOENT {
                     let msg = String(cString: strerror(errno))
-                    throw Tiny11Error.registryError("查找注册表键 \(keyPath) 出错：\(msg)")
+                    throw Tiny11Error.registryError(L10n.hiveFindKeyFailed(keyPath: keyPath, message: msg))
                 }
                 return nil
             }
@@ -95,7 +97,7 @@ public final class HiveSession {
                 }
                 guard next != 0 else {
                     let msg = String(cString: strerror(errno))
-                    throw Tiny11Error.registryError("创建注册表子键 '\(part)' (\(keyPath)) 失败：\(msg)")
+                    throw Tiny11Error.registryError(L10n.hiveCreateSubkeyFailed(part: part, keyPath: keyPath, message: msg))
                 }
             }
             current = next
@@ -108,7 +110,7 @@ public final class HiveSession {
         let h = try requireHandle()
         guard let listPtr = hivex_node_children(h, node) else {
             let msg = String(cString: strerror(errno))
-            throw Tiny11Error.registryError("读取注册表子键列表失败：\(msg)")
+            throw Tiny11Error.registryError(L10n.hiveReadChildrenFailed(msg))
         }
         defer { free(listPtr) }
 
@@ -132,7 +134,7 @@ public final class HiveSession {
         let rc = hivex_node_delete_child(h, node)
         guard rc == 0 else {
             let msg = String(cString: strerror(errno))
-            throw Tiny11Error.registryError("删除注册表节点 \(description) 失败：\(msg)")
+            throw Tiny11Error.registryError(L10n.hiveDeleteNodeFailed(description: description, message: msg))
         }
     }
 
@@ -181,11 +183,11 @@ public final class HiveSession {
         switch data {
         case .dword(let expected):
             guard let actual = try getDword(node: node, name: name), actual == expected else {
-                throw Tiny11Error.registryError("注册表回读校验失败：\(contextPath)\\\(name)")
+                throw Tiny11Error.registryError(L10n.hiveReadbackFailed(contextPath: contextPath, name: name))
             }
         case .string(let expected):
             guard let actual = try getString(node: node, name: name), actual == expected else {
-                throw Tiny11Error.registryError("注册表字符串回读校验失败：\(contextPath)\\\(name)")
+                throw Tiny11Error.registryError(L10n.hiveReadbackFailed(contextPath: contextPath, name: name))
             }
         }
     }
@@ -199,7 +201,7 @@ public final class HiveSession {
         contextPath: String
     ) throws {
         guard let keyDup = strdup(name) else {
-            throw Tiny11Error.registryError("内存分配失败")
+            throw Tiny11Error.registryError(L10n.hiveMemoryAllocFailed())
         }
         defer { free(keyDup) }
 
@@ -216,7 +218,7 @@ public final class HiveSession {
 
         guard rc == 0 else {
             let msg = String(cString: strerror(errno))
-            throw Tiny11Error.registryError("写入注册表值 \(contextPath)\\\(name) 失败：\(msg)")
+            throw Tiny11Error.registryError(L10n.hiveWriteValueFailed(contextPath: contextPath, name: name, message: msg))
         }
     }
 
@@ -226,7 +228,9 @@ public final class HiveSession {
         let rc = hivex_commit(h, nil, 0)
         guard rc == 0 else {
             let msg = String(cString: strerror(errno))
-            throw Tiny11Error.registryError("提交注册表修改至 \(URL(fileURLWithPath: path).lastPathComponent) 失败：\(msg)")
+            throw Tiny11Error.registryError(
+                L10n.hiveCommitFailed(fileName: URL(fileURLWithPath: path).lastPathComponent, message: msg)
+            )
         }
     }
 }
@@ -272,7 +276,7 @@ public enum OfflineHiveEditor {
                 }
                 try session.setValue(keyPath: resolvedKey, name: policy.name, data: policy.data)
                 summary.policiesWritten += 1
-                log("已写入策略: [\(policy.hive.rawValue)] \(resolvedKey)\\\(policy.name)")
+                log(L10n.logPolicyWritten(hive: policy.hive.rawValue, key: resolvedKey, name: policy.name))
             }
         }
 
@@ -284,7 +288,7 @@ public enum OfflineHiveEditor {
                 data: .dword(1)
             )
             summary.policiesWritten += 1
-            log("已启用 OOBE 本地账户直通 (BypassNRO=1)")
+            log(L10n.logBypassNROEnabled())
         }
 
         // 4. 离线预装 AppX 防重装注册与 Staged 项清理
@@ -313,7 +317,7 @@ public enum OfflineHiveEditor {
                     if subStore == "Staged" || subStore == "Applications" {
                         try software.deleteNode(childNode, description: "\(storePath)\\\(pkgKeyName)")
                         summary.removedStagedEntries += 1
-                        log("已清理离线预装包注册项: \(subStore)\\\(pkgKeyName)")
+                        log(L10n.logRemovedStagedEntry(subStore: subStore, pkgKeyName: pkgKeyName))
                     }
                 }
             }
@@ -322,7 +326,7 @@ public enum OfflineHiveEditor {
         for family in familiesToDeprovision.sorted() {
             _ = try software.ensureNode(path: "\(appxStoreBase)\\Deprovisioned\\\(family)")
             summary.deprovisionedFamilies.append(family)
-            log("已锁定预装应用防重装标记: Deprovisioned\\\(family)")
+            log(L10n.logLockedDeprovisioned(family))
         }
 
         // 5. 若物理移除了 Edge 文件，同步清理已安装程序列表中的 Microsoft Edge 卸载入口（对应原版 EdgeRegistration.cs）
@@ -339,7 +343,7 @@ public enum OfflineHiveEditor {
                        publisher.caseInsensitiveCompare("Microsoft Corporation") == .orderedSame {
                         try software.deleteNode(child, description: "\(uninstallPath)\\Microsoft Edge")
                         summary.edgeUninstallRemoved = true
-                        log("已移除离线 Edge 卸载残留项: \(uninstallPath)\\Microsoft Edge")
+                        log(L10n.logRemovedEdgeUninstall(uninstallPath))
                     }
                 }
             }
@@ -364,7 +368,7 @@ public enum OfflineHiveEditor {
                     if !summary.disabledServices.contains(matched.name) {
                         summary.disabledServices.append(matched.name)
                     }
-                    log("Core: 已禁用服务 \(keyName)\\Services\\\(matched.name)")
+                    log(L10n.logCoreDisabledService(controlSet: keyName, service: matched.name))
                 }
             }
             for policy in PolicyCatalog.coreSoftwarePolicies {
@@ -385,7 +389,7 @@ public enum OfflineHiveEditor {
         defer { system.close() }
         for policy in PolicyCatalog.values(forOptionId: "hardware-bypass") where policy.hive == .system {
             try system.setValue(keyPath: policy.keyPath, name: policy.name, data: policy.data)
-            log("已在引导镜像写入硬件绕过策略: \(policy.keyPath)\\\(policy.name)")
+            log(L10n.logBootBypassWritten(keyPath: policy.keyPath, name: policy.name))
         }
         try system.commit()
     }

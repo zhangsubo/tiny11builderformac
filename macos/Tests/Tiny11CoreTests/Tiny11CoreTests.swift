@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Tiny11Core
 
-@Suite("Tiny11Core Native Engine Tests")
+@Suite("Tiny11Core Native Engine Tests", .serialized)
 struct Tiny11CoreTests {
 
     @Test("WIM UTF-16LE XML 解析准确识别 ARM64 与 x64 系统版本及推荐专业版")
@@ -67,6 +67,133 @@ struct Tiny11CoreTests {
         #expect(ImagePruner.preserveCoreWinSxSDirectory("arm64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.26100.1_none"))
         #expect(ImagePruner.preserveCoreWinSxSDirectory("Manifests"))
         #expect(!ImagePruner.preserveCoreWinSxSDirectory("arm64_microsoft-windows-calc_31bf3856ad364e35_10.0.26100.1_none"))
+    }
+
+    @Test("i18n 系统语言跟随与非支持语言回退英文规则验证")
+    func languageResolutionAndFallback() {
+        let emptyEnv: [String: String] = [:]
+
+        // 六种受支持语言及地区变体识别
+        #expect(AppLanguage.resolve(preferredLanguages: ["zh-Hans-CN", "en-US"], environment: emptyEnv) == .zh)
+        #expect(AppLanguage.resolve(preferredLanguages: ["zh_CN"], environment: emptyEnv) == .zh)
+        #expect(AppLanguage.resolve(preferredLanguages: ["zh-Hant-HK"], environment: emptyEnv) == .zh)
+        #expect(AppLanguage.resolve(preferredLanguages: ["en-US"], environment: emptyEnv) == .en)
+        #expect(AppLanguage.resolve(preferredLanguages: ["en-GB"], environment: emptyEnv) == .en)
+        #expect(AppLanguage.resolve(preferredLanguages: ["fr-FR"], environment: emptyEnv) == .fr)
+        #expect(AppLanguage.resolve(preferredLanguages: ["fr-CA"], environment: emptyEnv) == .fr)
+        #expect(AppLanguage.resolve(preferredLanguages: ["es-ES"], environment: emptyEnv) == .es)
+        #expect(AppLanguage.resolve(preferredLanguages: ["es-419"], environment: emptyEnv) == .es)
+        #expect(AppLanguage.resolve(preferredLanguages: ["ru-RU"], environment: emptyEnv) == .ru)
+        #expect(AppLanguage.resolve(preferredLanguages: ["ar-SA"], environment: emptyEnv) == .ar)
+
+        // RTL 仅对阿拉伯语生效
+        #expect(AppLanguage.ar.isRTL == true)
+        for nonRtl in [AppLanguage.zh, .en, .fr, .es, .ru] {
+            #expect(nonRtl.isRTL == false)
+        }
+
+        // 非中/英/法/西/俄/阿的系统首选语言一律回退为英文（即使第二顺位包含中文/法文）
+        #expect(AppLanguage.resolve(preferredLanguages: ["ja-JP", "zh-Hans-JP"], environment: emptyEnv) == .en)
+        #expect(AppLanguage.resolve(preferredLanguages: ["de-DE", "fr-DE"], environment: emptyEnv) == .en)
+        #expect(AppLanguage.resolve(preferredLanguages: ["ko-KR"], environment: emptyEnv) == .en)
+        #expect(AppLanguage.resolve(preferredLanguages: ["pt-BR"], environment: emptyEnv) == .en)
+        #expect(AppLanguage.resolve(preferredLanguages: [], environment: emptyEnv) == .en)
+
+        // 环境变量显式覆盖测试支持
+        #expect(AppLanguage.resolve(preferredLanguages: ["ja-JP"], environment: ["TINY11_LANG": "ru"]) == .ru)
+
+        // 验证全部 39 个清理规则与 UI/Core 文案在 6 种语言下均完整非空且无未翻译 ID 回退
+        for lang in AppLanguage.allCases {
+            L10n.withLanguage(lang) {
+                for cat in CleanupCategory.allCases {
+                    #expect(!cat.title.isEmpty)
+                }
+                for opt in CleanupCatalog.options {
+                    #expect(!opt.title.isEmpty)
+                    #expect(opt.title != opt.id)
+                    #expect(!opt.description.isEmpty)
+                    #expect(opt.description != opt.id)
+                }
+                for mode in BuildMode.allCases {
+                    #expect(!mode.title.isEmpty)
+                    #expect(!mode.summary.isEmpty)
+                }
+                #expect(!L10n.startBuildButton().isEmpty)
+                #expect(!L10n.tiny11EdgeToggleLabel().isEmpty)
+            }
+        }
+    }
+
+    @Test("Tiny11 标准精简版支持可选是否精简 Edge 及旧版配方兼容解码")
+    func tiny11StandardEdgeOptionAndLegacyRecipeDecode() throws {
+        // 1. 默认标准版开启精简 Edge
+        let defaultStd = BuildRecipe(mode: .tiny11)
+        #expect(defaultStd.tiny11RemoveEdge == true)
+        #expect(defaultStd.selectedOptions.contains("edge-files"))
+        #expect(defaultStd.selectedOptions.contains("edge"))
+
+        // 2. 标准版关闭精简 Edge 时保留 Edge/WebView2 文件，但继续保留其他标准清理规则
+        let keepEdgeStd = BuildRecipe(mode: .tiny11, tiny11RemoveEdge: false)
+        #expect(keepEdgeStd.tiny11RemoveEdge == false)
+        #expect(!keepEdgeStd.selectedOptions.contains("edge-files"))
+        #expect(keepEdgeStd.selectedOptions.contains("edge"))
+        #expect(keepEdgeStd.selectedOptions.contains("onedrive-files"))
+        #expect(keepEdgeStd.selectedOptions.contains("clipchamp"))
+
+        // 3. 验证 ImagePruner 在标准版开关切换时对 Edge 目录的裁剪计划
+        let sampleWimPaths = [
+            "/Program Files (x86)/Microsoft/Edge",
+            "/Program Files (x86)/Microsoft/EdgeCore",
+            "/Program Files (x86)/Microsoft/EdgeUpdate",
+            "/Program Files (x86)/Microsoft/EdgeWebView",
+            "/Windows/System32/Microsoft-Edge-Webview",
+            "/Windows/System32/OneDriveSetup.exe"
+        ]
+        let dummyImg = WindowsImage(
+            index: 1, name: "Windows 11 Pro", description: "Windows 11 Pro",
+            architecture: .arm64, major: 10, minor: 0, build: 26100, servicePackBuild: 1,
+            editionId: "Professional", installationType: "Client", totalBytes: 16_000_000_000
+        )
+
+        let planRemoveEdge = try ImagePruner.buildPrunePlan(
+            allWimPaths: sampleWimPaths, image: dummyImg, recipe: defaultStd, hasRegistryPending: false, log: { _ in }
+        )
+        #expect(planRemoveEdge.edgeFilesIncluded == true)
+        #expect(planRemoveEdge.deleteWimPaths.contains("/Program Files (x86)/Microsoft/Edge"))
+        #expect(planRemoveEdge.deleteWimPaths.contains("/Windows/System32/Microsoft-Edge-Webview"))
+
+        let planKeepEdge = try ImagePruner.buildPrunePlan(
+            allWimPaths: sampleWimPaths, image: dummyImg, recipe: keepEdgeStd, hasRegistryPending: false, log: { _ in }
+        )
+        #expect(planKeepEdge.edgeFilesIncluded == false)
+        #expect(!planKeepEdge.deleteWimPaths.contains("/Program Files (x86)/Microsoft/Edge"))
+        #expect(!planKeepEdge.deleteWimPaths.contains("/Windows/System32/Microsoft-Edge-Webview"))
+        #expect(planKeepEdge.deleteWimPaths.contains("/Windows/System32/OneDriveSetup.exe"))
+
+        // 4. 验证不含 tiny11RemoveEdge 字段的旧版 JSON 配方兼容反序列化
+        let legacyJsonWithoutEdgeFlag = """
+        {
+          "compactInstallation" : true,
+          "compression" : "Recovery",
+          "coreAcknowledged" : false,
+          "coreFlavor" : false,
+          "enableNetFx3" : false,
+          "imageIndex" : 1,
+          "keepWorkingFiles" : false,
+          "mode" : "Tiny11",
+          "omitNetFx3Payload" : false,
+          "outputPath" : "/tmp/out.iso",
+          "preferLocalAccount" : true,
+          "removeRedundantData" : true,
+          "schemaVersion" : 1,
+          "selectedOptions" : ["onedrive-files", "edge"],
+          "sourcePath" : "/tmp/in.iso",
+          "workspacePath" : "/tmp/work"
+        }
+        """
+        let decodedLegacy = try JSONDecoder().decode(BuildRecipe.self, from: Data(legacyJsonWithoutEdgeFlag.utf8))
+        #expect(decodedLegacy.mode == .tiny11)
+        #expect(decodedLegacy.tiny11RemoveEdge == false)
     }
 
     @Test("CHivex 离线注册表编辑器完整读写闭环测试")

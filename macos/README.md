@@ -18,7 +18,11 @@
    - **立省 ~7GB 虚拟磁盘占用**：自动关闭 Windows 11 预留空间（`ShippedWithReserves=0`）与自动设备加密（`PreventDeviceEncryption=1`），默认开启 `CompactOS` 透明压缩部署。
    - **完整保留虚拟机工具兼容性**：移除 20+ 款预装臃肿 UWP 应用（Clipchamp、News、Teams、Copilot、Xbox、Solitaire、OneDrive 等）及广告遥测，同时默认保留 `WebView2`、Windows Update 与安装服务，确保 **Parallels Tools / VMware Tools / SPICE Guest Tools** 一键顺畅安装。
 
-3. **开箱即用自包含 `.app` 应用包**
+3. **多语言国际化（i18n）与标准版灵活定制**
+   - **6 国语言自适应**：内置 **中文、英文、法文、西班牙文、俄文、阿拉伯文（含原生 RTL 从右向左镜像布局）** 六种语言，自动跟随 macOS 系统首选语言，若系统为其他语言则统一回退显示英文（亦支持在 macOS「系统设置 → 通用 → 语言与地区 → 应用程序」中单独指定语言，或通过环境变量 `TINY11_LANG=en|zh|fr|es|ru|ar` 预览）。
+   - **标准版可选是否精简 Edge**：在 **「Tiny11 · 标准精简版」** 卡片与定制页均提供独立的 **精简 Microsoft Edge** 开关，可按需选择彻底移除 Edge/WebView2 或完整保留其运行库兼容性，无需被迫退化为纯手动勾选模式。
+
+4. **开箱即用自包含 `.app` 应用包**
    - 打包产出的 `Tiny11Builder.app` 已将 `wimlib-imagex`、`mkisofs`、`libwim`、`libhivex`、`libintl` 内嵌并完成 `@executable_path` / `@loader_path` 动态库重定位与代码签名，拷贝到任意 Apple Silicon Mac 双击即可运行，无需用户手动安装命令行工具。
 
 ---
