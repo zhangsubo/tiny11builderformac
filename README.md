@@ -3,7 +3,7 @@
 原生 **Swift 6 + SwiftUI** 打造的 macOS 桌面版（支持 Apple Silicon `M1` / `M2` / `M3` / `M4`），**无需启动 Windows 虚拟机、无需 `sudo` 权限、无需 NTFS 分区**，即可在 Mac 本地将微软官方 Windows 11 ARM64 / x64 ISO 流式精简并重新封装为可引导 `.iso`，直接用于 **Parallels Desktop、VMware Fusion、UTM** 或物理 PC 装机。
 
 - 📦 [**下载 macOS 安装包 `Tiny11Builder-macOS-arm64.dmg` (GitHub Releases)**](https://github.com/zhangsubo/tiny11builderformac/releases/latest)
-- 📖 [**阅读 macOS 版专属说明文档 (`macos/readmeformac.md`)**](macos/readmeformac.md)
+- 📖 [**阅读 macOS 版专属说明文档 (`macos/readmeformac.md` · 中/英双语)**](macos/readmeformac.md)（[🇨🇳 中文说明](macos/readmeformac.md#中文说明) · [🇺🇸 English Guide](macos/readmeformac.md#english-documentation)）
 - ✨ **macOS 版核心亮点（已同步上游 `v0.2.0`）**：
   - **4 种构建模式**：内置专为 Parallels / Fusion / UTM 调优的 **「Tiny11 · Mac 虚拟机优化版」**（立省 ~7GB 虚拟磁盘、OOBE 无网卡防死锁、保留 Guest Tools 兼容）、支持独立 **Edge 精简开关** 的 **「Tiny11 · 标准精简版」**、支持 **6 项底层载荷深度裁剪** 的 **「自定义模式」**（兼容导入 [`recipes/cd700-custom.json`](recipes/cd700-custom.json)）以及 **「Tiny11 Core」**。
   - **支持 `boot.wim` 单卷极限压缩**（`Shrink boot.wim`）、Legacy Setup 密钥界面应答修复与 ISO 体积预算校验。
